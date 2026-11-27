@@ -55,7 +55,10 @@ export class MiniBoard {
   /** Redraw on the next run even if nothing moved (the colours or the look changed). */
   invalidate(): void { this.dirty = true; }
 
-  /** Step if one is due, then redraw if anything moved. Returns whether a generation passed. */
+  /**
+   * Step if one is due, then redraw if anything moved. Returns whether a generation passed. A speed of
+   * 0 holds the board still while it keeps redrawing changes to the look.
+   */
   run(now: number, rule: Rule, speed: number, pal: Palette, look: Look): boolean {
     const interval = 1000 / speed;
     const stepped = now - this.lastStep >= interval;

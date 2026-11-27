@@ -149,6 +149,7 @@ function frame(now: number): void {
   lastT = t;
   if (labDrawer.amount > 0) runPreview(now);
   if (themeDrawer.amount > 0) runThemePreview(now);
+  if (setDrawer.amount > 0) runStylePreview(now);
   activeDemo?.tick(now);
   requestAnimationFrame(frame);
 }
@@ -290,6 +291,7 @@ function panelToggled(panel: HTMLElement, opener: HTMLElement, open: boolean): v
     closePops();
     el<HTMLElement>('[data-close]', panel).focus({ preventScroll: true });
     if (panel === libPanel) drawThumbnails();
+    if (panel === setPanel) restartStylePreview();
     if (panel === labPanel) labBoard.fit();
   } else if (panel.contains(document.activeElement)) {
     opener.focus({ preventScroll: true });
@@ -480,6 +482,34 @@ const redrawBoards = () => {
   redrawMiniBoards();
   dirty = true;
 };
+
+// The cell style preview in Settings: the board in the current look, since the panel hides most of
+// the real one. While a slider is being dragged it holds still, so shapes can be compared.
+const STYLE_PREVIEW_COLS = 18;
+const STYLE_PREVIEW_ROWS = 10;
+const STYLE_PREVIEW_SPEED = 4;
+/** How long after the last slider movement the preview stays still (ms). */
+const STYLE_PREVIEW_HOLD = 1200;
+const styleBoard = miniBoard(el<HTMLCanvasElement>('#styleCv'), STYLE_PREVIEW_COLS, STYLE_PREVIEW_ROWS);
+const styleQuiet = new QuietWatcher();
+let styleHeldAt = -Infinity;
+
+function restartStylePreview(): void {
+  styleBoard.restart();
+  styleQuiet.reset();
+}
+el('#styleSoup').addEventListener('click', restartStylePreview);
+setPanel.addEventListener('input', (e) => {
+  if ((e.target as Element).matches('input[type="range"]')) styleHeldAt = performance.now();
+});
+
+/** Called from the main loop while Settings is showing. Starts afresh once it has gone quiet. */
+function runStylePreview(now: number): void {
+  const speed = now - styleHeldAt < STYLE_PREVIEW_HOLD ? 0 : STYLE_PREVIEW_SPEED; // 0: no steps, still redraws
+  if (styleBoard.run(now, rule, speed, palette(), { ...settings, wrap: true }) && styleQuiet.update(styleBoard.life.cur)) {
+    restartStylePreview();
+  }
+}
 bindRange('melt', 'melt', MELT_MIN, MELT_MAX, redrawBoards);
 bindRange('gaps', 'gaps', GAPS_MIN, GAPS_MAX, redrawBoards);
 syncGoo();
@@ -711,6 +741,7 @@ setPanel.addEventListener('click', (e) => {
   if ((choice && group) || toggle) {
     save();
     syncSettingsPanel();
+    redrawMiniBoards();
     dirty = true;
   }
   if (target.closest('#openLab')) openLab();

@@ -114,6 +114,13 @@
       <div class="group"><h3>Theme</h3><div class="themes" id="themes"></div></div>
       <div class="group"><h3>Cell style</h3>
         <div class="seg" data-key="style"><button type="button" data-v="goo">Goo</button><button type="button" data-v="dots">Dots</button><button type="button" data-v="pixels">Pixels</button></div>
+        <!-- The board in this look, live: the panel hides most of the real one. -->
+        <div class="preview preview-wide">
+          <canvas id="styleCv" aria-label="Preview of the cell style"></canvas>
+          <button type="button" class="ib ib-sm" id="styleSoup" aria-label="Restart the preview from new soup" title="New soup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          </button>
+        </div>
         <div class="slider" id="stickyRow"><h3><label for="stickiness">Stickiness</label><button type="button" class="info-dot" data-demo="stickiness" aria-label="Show what stickiness does"></button><output id="stickyOut" for="stickiness"></output></h3><input type="range" id="stickiness"></div>
         <div class="slider" id="meltRow"><h3><label for="melt">Colour melt</label><button type="button" class="info-dot" data-demo="melt" aria-label="Show what colour melt does"></button><output id="meltOut" for="melt"></output></h3><input type="range" id="melt"></div>
         <div class="slider" id="gapsRow"><h3><label for="gaps">Gaps</label><button type="button" class="info-dot" data-demo="gaps" aria-label="Show what gaps does"></button><output id="gapsOut" for="gaps"></output></h3><input type="range" id="gaps"></div></div>
