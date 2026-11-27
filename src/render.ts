@@ -117,7 +117,7 @@ const ageBucket = (a: number) => (a <= 1 ? 0 : a <= 3 ? 1 : a <= 9 ? 2 : a <= 29
 const grow = (t: number) => { const u = t - 1; return 1 + 2.5 * u * u * u + 1.5 * u * u; };
 const shrink = (t: number) => 1 - t * t * (3 - 2 * t);
 
-/** Draws the live board. Holds per-cell scratch arrays so nothing is allocated per frame. */
+/** Draws the live board. Holds per-cell scratch arrays so the cells allocate nothing per frame. */
 export class BoardRenderer {
   private size = new Float32Array(0);
   private colour = new Int8Array(0);
@@ -170,16 +170,13 @@ export class BoardRenderer {
 
     if (look.critters) {
       this.critters.draw(ctx, {
-        life, place: view, t, now, iris: pal.iris, ink: pal.fg, pairs: look.style === 'goo',
+        life, place: view, now, iris: pal.iris, ink: pal.fg, pairs: look.style === 'goo',
         skinOf: (i) => colours[colour[i]!]!,
+        sizeOf: (i) => size[i]!,
       });
     } else if (this.critters.active) {
+      // Turned off: forget them, so they open their eyes afresh when turned back on.
       this.critters.reset();
     }
-  }
-
-  /** True while critters are on screen: their eyes move on their own, so keep drawing every frame. */
-  get animating(): boolean {
-    return this.critters.active;
   }
 }

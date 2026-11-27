@@ -100,7 +100,7 @@ function frame(now: number): void {
   const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - lastStep) / Math.min(260, interval * 0.85));
   renderer.critters.calm = reducedMotion.matches;
   // Critters' eyes move on their own, so while any are showing the board redraws every frame.
-  if (t < 1 || lastT < 1 || dirty || (settings.critters && renderer.animating)) {
+  if (t < 1 || lastT < 1 || dirty || (settings.critters && renderer.critters.active)) {
     renderer.draw(ctx, life, view, palette(), settings, t, now);
     dirty = false;
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRITTER_AGE, creaseColour, findSpots, positionHash } from '../src/critters';
+import { CRITTER_AGE, Critters, creaseColour, findSpots, positionHash } from '../src/critters';
 import { Life, parseRule } from '../src/life';
 
 const CONWAY = parseRule('B3/S23')!;
@@ -47,6 +47,64 @@ describe('findSpots', () => {
     const life = blocks(CRITTER_AGE + 2);
     expect(findSpots(life, true)).toEqual(findSpots(life, true));
     expect(findSpots(life, false).every((s) => s.kind === 'single')).toBe(true);
+  });
+});
+
+describe('Critters', () => {
+  /** A canvas context that accepts every call and draws nothing. */
+  const ctx = new Proxy({}, { get: () => () => {}, set: () => true }) as unknown as CanvasRenderingContext2D;
+  const place = { cell: 10, ox: 0, oy: 0 };
+
+  /** Draw frames 16 ms apart for `seconds`, the way the board's loop would. */
+  function run(critters: Critters, life: Life, seconds: number, start = { now: 0 }): void {
+    for (let s = 0; s < seconds; s += 0.016) {
+      start.now += 16;
+      critters.draw(ctx, { life, place, now: start.now, iris: '#5DB6F2', ink: '#000', pairs: true, skinOf: () => '#3E9A47', sizeOf: () => 1 });
+    }
+  }
+
+  it('keeps a critter while its cell melts, and drops it once the melt is over', () => {
+    const life = blocks(CRITTER_AGE + 2);
+    const critters = new Critters();
+    run(critters, life, 0.1);
+    const before = critters.eyes().length;
+    expect(before).toBeGreaterThan(0);
+
+    // A generation in which every cell dies: the critters stay to close their eyes...
+    life.prev.set(life.cur);
+    life.cur.fill(0);
+    life.gen++;
+    run(critters, life, 0.1);
+    expect(critters.eyes().length).toBe(before);
+
+    // ...and are gone by the next one.
+    life.prev.fill(0);
+    life.gen++;
+    run(critters, life, 0.1);
+    expect(critters.eyes()).toEqual([]);
+    expect(critters.active).toBe(false); // so the board stops redrawing every frame
+  });
+
+  it('drops a critter at once when its cell is erased', () => {
+    const life = blocks(CRITTER_AGE + 2);
+    const critters = new Critters();
+    run(critters, life, 0.1);
+    life.clear();
+    run(critters, life, 0.016);
+    expect(critters.eyes()).toEqual([]);
+  });
+
+  it('old critters fall asleep, and a tap keeps them awake for a while', () => {
+    const life = blocks(CRITTER_AGE + 2);
+    life.ages.forEach((a, i) => { if (a) life.ages[i] = 1000; });
+    const critters = new Critters();
+    const clock = { now: 0 };
+    run(critters, life, 1, clock);
+    expect(critters.eyes().every((e) => e.asleep)).toBe(true);
+
+    for (let y = 2; y < 24; y += 4) for (let x = 2; x < 24; x += 4) critters.poke(x, y);
+    run(critters, life, 2, clock);
+    expect(critters.eyes().some((e) => e.asleep)).toBe(false);
   });
 });
 

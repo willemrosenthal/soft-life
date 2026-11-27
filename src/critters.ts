@@ -94,9 +94,10 @@ export function findSpots(life: Life, pairs: boolean): Spot[] {
     for (let y = 0; y < rows - 1; y++) {
       for (let x = 0; x < cols - 1; x++) {
         const i = y * cols + x;
+        // Cheap checks first: this runs every frame, over every cell.
+        if (!ok(i) || used[i] || positionHash(x, y + 99) >= PAIR_CHANCE) continue;
         const cells = [i, i + 1, i + cols, i + cols + 1];
         if (!cells.every((j) => ok(j) && !used[j] && cur[j] === cur[i])) continue;
-        if (positionHash(x, y + 99) >= PAIR_CHANCE) continue;
         for (const j of cells) used[j] = 1;
         spots.push({ key: -(i + 1), kind: 'pair', cells, x: x + 1, y: y + 1, traits: 'pair' });
       }
@@ -180,7 +181,8 @@ export class Eye {
 
   constructor(traits: Traits) { this.t = traits; }
 
-  get now(): number { return this.time; }
+  /** Seconds this eye has been running. */
+  get clock(): number { return this.time; }
 
   blink(dur = 0.17, double = false): void {
     if (this.blinkT >= 0 || this.gap > 0) return;
@@ -201,8 +203,6 @@ export class Eye {
     this.mood = 'startled';
     this.moodT = 0.9;
     this.lookAt(dx, dy, 1.2);
-    this.asleep = false;
-    this.sleepiness = 0;
   }
 
   delight(): void {
@@ -421,6 +421,15 @@ interface Critter {
   zTimer: number;
 }
 
+/**
+ * Wake a critter (with a fluttery double blink if it was asleep) and keep it awake for `seconds`.
+ * Without the hold, an old critter would nod straight back off on the next frame.
+ */
+function rouse(cr: Critter, seconds: number): void {
+  cr.eye.wake();
+  cr.awakeUntil = Math.max(cr.awakeUntil, cr.eye.clock + seconds);
+}
+
 interface Z { x: number; y: number; c: number; t: number; dx: number }
 
 /** Where the grid sits, in canvas units. */
@@ -429,19 +438,16 @@ export interface Placement { cell: number; ox: number; oy: number }
 export interface CritterFrame {
   life: Life;
   place: Placement;
-  /** 0 → 1 between generations, as in BoardRenderer. */
-  t: number;
   /** Wall-clock time in ms (requestAnimationFrame's timestamp). */
   now: number;
-  /** Fill colour of cell i (only asked for live or melting cells). */
+  /** Fill colour and drawn size (1 = full, less while melting) of cell i; only asked for live or melting cells. */
   skinOf: (i: number) => string;
+  sizeOf: (i: number) => number;
   iris: string;
   /** Colour of the floating z's. */
   ink: string;
   pairs: boolean;
 }
-
-const shrink = (t: number) => 1 - t * t * (3 - 2 * t);
 
 export class Critters {
   private critters = new Map<number, Critter>();
@@ -458,8 +464,9 @@ export class Critters {
     return this.critters.size > 0 || this.zs.length > 0;
   }
 
-  count(): number {
-    return this.critters.size;
+  /** The critters' eyes, for inspection. */
+  eyes(): Eye[] {
+    return [...this.critters.values()].map((cr) => cr.eye);
   }
 
   reset(): void {
@@ -471,18 +478,19 @@ export class Critters {
 
   /** A tap at (x, y), in grid units: critters close by flinch, and sleepers nearby wake up. */
   poke(x: number, y: number): void {
+    if (this.calm) return;
     for (const cr of this.critters.values()) {
       const dx = x - cr.spot.x, dy = y - cr.spot.y, d = Math.hypot(dx, dy);
+      if (d < 5) rouse(cr, 6);
       if (d < 2.6) cr.eye.startle(dx, dy);
-      if (d < 5) { cr.eye.wake(); cr.awakeUntil = cr.eye.now + 6; }
     }
   }
 
   draw(ctx: CanvasRenderingContext2D, f: CritterFrame): void {
     const dt = this.lastNow < 0 ? 0 : clamp((f.now - this.lastNow) / 1000, 0, 0.05);
     this.lastNow = f.now;
-    const { life, place, t } = f;
-    const { cur, prev, ages } = life;
+    const { life, place } = f;
+    const { cur, ages } = life;
     const changed = life.gen !== this.lastGen;
     this.lastGen = life.gen;
 
@@ -493,22 +501,21 @@ export class Critters {
     for (const cr of this.critters.values()) {
       const { spot, eye } = cr;
       const lead = spot.cells[0]!;
-      const alive = spot.cells.every((i) => cur[i]);
-      const dying = !alive;
+      // Not every cell alive means it's melting away (sync keeps only those).
+      const dying = !spot.cells.every((i) => cur[i]);
 
       if (!dying) {
         let attention: Vec | null = null;
         let squint = false;
-        if (this.pointer) {
+        if (this.pointer && !this.calm) {
           const dx = this.pointer.x - spot.x, dy = this.pointer.y - spot.y, d = Math.hypot(dx, dy);
           if (d < 7) {
             attention = { x: dx / Math.max(d, 1.8), y: dy / Math.max(d, 1.8) };
-            eye.wake();
-            cr.awakeUntil = eye.now + 5;
+            rouse(cr, 5);
           }
           if (d < 0.75 && !eye.t.shy) squint = true;
         }
-        const awake = eye.now < cr.awakeUntil;
+        const awake = eye.clock < cr.awakeUntil;
         const over = (ages[lead] ?? 0) - cr.sleepAge;
         eye.sleepiness = awake || over <= -24 ? 0 : clamp(over / 60 + 0.4, 0, 1);
         if (!awake && over > 40) eye.asleep = true;
@@ -517,13 +524,14 @@ export class Critters {
         eye.update(dt, { calm: true });
       }
 
-      const k = dying ? shrink(t) : 1;
-      const extraLid = dying ? clamp(t * 1.6, 0, 1) : 0;
-      const skin = f.skinOf(cur[lead] ? lead : spot.cells.find((i) => prev[i]) ?? lead);
+      // While melting, the eye shrinks with its cell and shuts a little ahead of it.
+      const k = dying ? f.sizeOf(lead) : 1;
+      const extraLid = dying ? clamp((1 - k) * 1.6, 0, 1) : 0;
+      const skin = f.skinOf(lead);
       const cx = ox + spot.x * c;
       const cy = oy + spot.y * c;
 
-      if (eye.asleep && !dying) {
+      if (eye.asleep && !dying && !this.calm) {
         cr.zTimer -= dt;
         if (cr.zTimer < 0) {
           cr.zTimer = rand(1.8, 3);
@@ -597,6 +605,7 @@ export class Critters {
 
   /** Respond to the generation that just happened: births nearby draw a glance or a smile, deaths next door a flinch. */
   private react(life: Life): void {
+    if (this.calm) return;
     const { cols, cur, prev } = life;
     const births: Vec[] = [];
     const deaths: Vec[] = [];
@@ -621,8 +630,8 @@ export class Critters {
         if (d < nd) { nd = d; near = { x: dx, y: dy }; }
       }
       if (startle && Math.random() < 0.7) {
+        rouse(cr, 4);
         eye.startle(startle.x, startle.y);
-        eye.wake();
       } else if (near && nd < reach + 0.3 && Math.random() < 0.5) {
         eye.delight();
       } else if (near && nd < 5 && !eye.asleep && Math.random() < 0.35) {
