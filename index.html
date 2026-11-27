@@ -138,6 +138,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
       </button>
       <h2 id="labTitle">Rule lab</h2>
+      <button type="button" class="ib ib-sm" id="labInfoBtn" aria-label="How rules work" aria-controls="labInfo" aria-expanded="false" title="How rules work">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="1.1" fill="currentColor" stroke="none"/></svg>
+      </button>
       <button type="button" class="ib ib-sm" data-close aria-label="Close rule lab">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -151,6 +154,7 @@
         </button>
         <span class="preview-gen" id="labGen">Gen 0</span>
       </div>
+      <div class="group"><div class="slider"><h3><label for="labSpeed">Preview speed</label><output id="labSpeedOut" for="labSpeed"></output></h3><input type="range" id="labSpeed"></div></div>
       <div class="group"><h3>Born with<small>An empty spot comes alive</small></h3><div class="counts" id="labBorn"></div></div>
       <div class="group"><h3>Survives with<small>A living cell stays alive</small></h3><div class="counts" id="labSurvive"></div></div>
       <p class="rule-line" id="labLine"></p>
@@ -173,6 +177,82 @@
         <p class="empty" id="labEmpty">Rules you save show up here. They stay in this browser.</p>
       </div>
     </div>
+
+    <!-- How rules work: slides over the lab, opened by the (i) button. -->
+    <section class="lab-info" id="labInfo" aria-labelledby="labInfoTitle" hidden>
+      <div class="panel-head">
+        <button type="button" class="ib ib-sm" id="labInfoBack" aria-label="Back to the Rule lab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <h2 id="labInfoTitle">How rules work</h2>
+      </div>
+      <div class="panel-body info">
+        <figure class="hood">
+          <svg viewBox="0 0 92 92" aria-hidden="true">
+            <rect class="hood-empty" x="2" y="2" width="26" height="26" rx="13"/>
+            <rect class="hood-alive" x="33" y="2" width="26" height="26" rx="13"/>
+            <rect class="hood-empty" x="64" y="2" width="26" height="26" rx="13"/>
+            <rect class="hood-empty" x="2" y="33" width="26" height="26" rx="13"/>
+            <rect class="hood-centre" x="33" y="33" width="26" height="26" rx="13"/>
+            <rect class="hood-alive" x="64" y="33" width="26" height="26" rx="13"/>
+            <rect class="hood-alive" x="2" y="64" width="26" height="26" rx="13"/>
+            <rect class="hood-empty" x="33" y="64" width="26" height="26" rx="13"/>
+            <rect class="hood-empty" x="64" y="64" width="26" height="26" rx="13"/>
+          </svg>
+          <figcaption>The empty spot in the middle has <b>3 living neighbours</b>. Under Conway's rule, a cell is born there next generation.</figcaption>
+        </figure>
+
+        <section>
+          <h3>Every spot counts its eight neighbours</h3>
+          <p>The board is a grid of spots, each alive or empty. Every generation, each spot counts how many of the eight spots around it are alive. Then every spot changes at the same moment, based only on that count.</p>
+        </section>
+
+        <section>
+          <h3>Born with</h3>
+          <p>An <b>empty</b> spot whose count is one of these numbers gets a new cell. Any other count and it stays empty.</p>
+        </section>
+
+        <section>
+          <h3>Survives with</h3>
+          <p>A <b>living</b> cell whose count is one of these numbers stays alive. Any other count and it dies.</p>
+        </section>
+
+        <section>
+          <h3>Reading a rule: B3/S23</h3>
+          <p>B is born with, S is survives with. Conway's Life is <code>B3/S23</code>: a cell is born with exactly 3 neighbours and survives with 2 or 3. With 0 or 1 it dies of loneliness; with 4 or more it dies of crowding.</p>
+        </section>
+
+        <section>
+          <h3>Things to try</h3>
+          <ul>
+            <li><b>Born with 1 or 2</b> usually spreads wildly and fills the board with noise.</li>
+            <li><b>Born only with 5 or more</b> usually dies out: few spots ever get that crowded.</li>
+            <li><b>Survives with 4 to 8</b> grows solid blobs that creep outward, like coral.</li>
+            <li><b>Nothing in Survives</b> means every cell lives a single generation. Seeds (<code>B2/S</code>) gives endless sparks.</li>
+            <li><b>Adding 6 to Conway's Born</b> gives HighLife (<code>B36/S23</code>), where one small pattern copies itself.</li>
+            <li><b>Day &amp; Night</b> (<code>B3678/S34678</code>) behaves the same if you swap alive and empty.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>Why 0 is switched off</h3>
+          <p>Born with 0 would bring every lonely empty spot to life at once, so the whole board would flash on and off.</p>
+        </section>
+
+        <section>
+          <h3>Is that all a rule can be?</h3>
+          <p>For rules like Life, yes. Every one of them is just these two lists, which makes 262,144 possible rules (131,072 here, without born with 0). Everything else stays fixed: a square grid, eight neighbours, alive or empty, and everyone changes at once.</p>
+          <p>Change one of those and you get other families of rules that people explore:</p>
+          <ul>
+            <li><b>Which neighbours, not just how many.</b> A cell can treat a corner neighbour differently from a side one.</li>
+            <li><b>Other neighbourhoods.</b> Only the four side neighbours, hexagons, or a wider ring of neighbours (“Larger than Life”).</li>
+            <li><b>More than two states.</b> Dying cells fade through stages before they're gone, as in Brian's Brain.</li>
+            <li><b>Smooth worlds.</b> Cells can be partly alive, as in SmoothLife and Lenia.</li>
+          </ul>
+          <p>In Softlife, colour never changes who lives. A newborn just takes the colour most of its neighbours have.</p>
+        </section>
+      </div>
+    </section>
   </aside>
   </div>
 

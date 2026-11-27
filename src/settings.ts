@@ -16,6 +16,8 @@ export interface Settings {
   smooth: boolean;
   /** Generations per second: one of SPEED_STEPS. */
   speed: number;
+  /** The Rule lab preview's generations per second: one of SPEED_STEPS. */
+  labSpeed: number;
   /** Dots across the screen. */
   density: number;
   /** Goo style: how readily neighbours melt together, 0 (tight) to 100 (gloopy). */
@@ -39,12 +41,16 @@ export const SPEED_STEPS: readonly number[] = [
   ...SLOW_SPEEDS,
   ...Array.from({ length: SPEED_MAX - SPEED_MIN + 1 }, (_, i) => SPEED_MIN + i),
 ];
+/** A speed as people read it: "8/s", or "every 2s" below one a second. */
+export function formatSpeed(speed: number): string {
+  return speed >= 1 ? `${speed}/s` : `every ${+(1 / speed).toFixed(1)}s`;
+}
 export const DENSITY_MIN = 12;
 export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, smooth: true, speed: 8, density: 26, stickiness: 50, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
+  wrap: true, critters: true, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
 };
 
 const STYLES: readonly CellStyle[] = ['goo', 'dots', 'pixels'];
@@ -68,6 +74,7 @@ export function parseSettings(value: unknown): Settings {
     critters: flag(v.critters, d.critters),
     smooth: flag(v.smooth, d.smooth),
     speed: SPEED_STEPS.includes(v.speed as number) ? (v.speed as number) : d.speed,
+    labSpeed: SPEED_STEPS.includes(v.labSpeed as number) ? (v.labSpeed as number) : d.labSpeed,
     density: int(v.density, DENSITY_MIN, DENSITY_MAX, d.density),
     stickiness: int(v.stickiness, STICKINESS_MIN, STICKINESS_MAX, d.stickiness),
     melt: int(v.melt, MELT_MIN, MELT_MAX, d.melt),

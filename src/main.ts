@@ -15,7 +15,7 @@ import {
   NAME_MAX, PRESETS, TREND_LABELS, TrendWatcher, formatRule, loadRules, mutateRule, nextRuleName, pickSurprise, ruleName,
   saveRules, seededRandom, type SavedRule, type Trend,
 } from './rules';
-import { DENSITY_MAX, DENSITY_MIN, loadSettings, saveSettings, SPEED_STEPS, type Settings } from './settings';
+import { DENSITY_MAX, DENSITY_MIN, formatSpeed, loadSettings, saveSettings, SPEED_STEPS, type Settings } from './settings';
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
@@ -275,7 +275,10 @@ stack.add('rail', rail);
 const libDrawer = stack.add('lib', new Drawer(libPanel, true, (open) => panelToggled(libPanel, libButton, open)));
 const setDrawer = stack.add('set', new Drawer(setPanel, true, (open) => panelToggled(setPanel, setButton, open)));
 // The Rule lab opens from Settings, so closing it hands focus back to the Settings button.
-const labDrawer = stack.add('lab', new Drawer(labPanel, true, (open) => panelToggled(labPanel, setButton, open)));
+const labDrawer = stack.add('lab', new Drawer(labPanel, true, (open) => {
+  if (!open) showLabInfo(false);
+  panelToggled(labPanel, setButton, open);
+}));
 
 railTab.addEventListener('click', () => rail.setOpen(true));
 libButton.addEventListener('click', () => stack.openModal(libDrawer));
@@ -380,7 +383,7 @@ const sizeOut = el('#sizeOut');
 const sizeBadge = el('#sizeBadge');
 
 function syncBoardPop(): void {
-  speedOut.textContent = settings.speed >= 1 ? `${settings.speed}/s` : `every ${+(1 / settings.speed).toFixed(1)}s`;
+  speedOut.textContent = formatSpeed(settings.speed);
   densityOut.textContent = `${life.cols} × ${life.rows}`;
 }
 function syncSize(): void {
@@ -692,7 +695,6 @@ function applyTheme(): void {
 /** The preview's grid: 4:3, like its frame. It always wraps, so every rule gets the same fair test. */
 const PREVIEW_COLS = 36;
 const PREVIEW_ROWS = 27;
-const PREVIEW_SPEED = 10;
 /** Saved-rule thumbnails: a small soup run this many generations, the same every time for a given rule. */
 const THUMB_COLS = 24;
 const THUMB_ROWS = 18;
@@ -750,7 +752,7 @@ function restartPreview(): void {
 
 /** Called from the main loop while the lab is showing. */
 function runPreview(now: number): void {
-  const interval = 1000 / PREVIEW_SPEED;
+  const interval = 1000 / settings.labSpeed;
   if (now - labLastStep >= interval) {
     preview.step(labRule, true);
     labLastStep = now;
@@ -816,6 +818,38 @@ function openLab(): void {
 }
 
 el('#labBack').addEventListener('click', () => stack.openModal(setDrawer));
+
+// The preview's own speed, on the same steps as the board's, remembered between visits.
+const labSpeedInput = el<HTMLInputElement>('#labSpeed');
+const labSpeedOut = el('#labSpeedOut');
+labSpeedInput.min = '0';
+labSpeedInput.max = String(SPEED_STEPS.length - 1);
+labSpeedInput.value = String(Math.max(0, SPEED_STEPS.indexOf(settings.labSpeed)));
+labSpeedOut.textContent = formatSpeed(settings.labSpeed);
+labSpeedInput.addEventListener('input', () => {
+  settings.labSpeed = SPEED_STEPS[Number(labSpeedInput.value)] ?? settings.labSpeed;
+  labSpeedOut.textContent = formatSpeed(settings.labSpeed);
+  save();
+});
+
+// How rules work: a page over the lab. The lab behind it is inert, so Tab stays on the page.
+const labInfo = el('#labInfo');
+const labInfoBtn = el('#labInfoBtn');
+const labMain = [el('.panel-head', labPanel), el('.panel-body', labPanel)];
+function showLabInfo(open: boolean): void {
+  if (open === !labInfo.hidden) return;
+  labInfo.hidden = !open;
+  labInfoBtn.setAttribute('aria-expanded', String(open));
+  for (const part of labMain) part.inert = open;
+  if (open) {
+    el('.panel-body', labInfo).scrollTop = 0;
+    el<HTMLElement>('#labInfoBack').focus({ preventScroll: true });
+  } else if (labDrawer.isOpen) {
+    labInfoBtn.focus({ preventScroll: true });
+  }
+}
+labInfoBtn.addEventListener('click', () => showLabInfo(true));
+el('#labInfoBack').addEventListener('click', () => showLabInfo(false));
 el('#labSoup').addEventListener('click', restartPreview);
 el('#labMutate').addEventListener('click', () => {
   labRule = mutateRule(labRule);
@@ -974,6 +1008,7 @@ document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'Escape') {
     if (pops.some((p) => !p.hidden)) closePops(true);
+    else if (!labInfo.hidden) showLabInfo(false);
     else stack.topModal()?.setOpen(false);
     return;
   }
