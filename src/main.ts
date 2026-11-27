@@ -1080,7 +1080,7 @@ function openDemo(button: HTMLElement): void {
   demoSheet.hidden = false;
   demoScrim.hidden = false;
   demoSheet.scrollTop = 0;
-  demo.shown(button.dataset.start ? Number(button.dataset.start) : undefined);
+  demo.shown(button.dataset.start);
   activeDemo = demo;
   el<HTMLElement>('[data-demo-close]', demoSheet).focus({ preventScroll: true });
 }
@@ -1098,7 +1098,6 @@ document.addEventListener('click', (e) => {
   const t = e.target as Element;
   const opener = t.closest<HTMLElement>('[data-demo]');
   if (opener) {
-    e.preventDefault();
     openDemo(opener);
   } else if (t.closest('[data-demo-close]') || t === demoScrim) {
     closeDemo();

@@ -33,8 +33,8 @@ export interface Demo {
   readonly el: HTMLElement;
   readonly title: string;
   tick(now: number): void;
-  /** Called each time the demo's sheet opens; `start` is a step for the rules player. */
-  shown(start?: number): void;
+  /** Called each time the demo's sheet opens; `start` names a step for the rules player (see STEPS). */
+  shown(start?: string): void;
 }
 
 export const DEMO_TITLES: Record<DemoKey, string> = {
@@ -159,6 +159,16 @@ function speedScene(): SliderSpec['draw'] {
   };
 }
 
+/** The board's speed and the lab preview's: the same steps and scene, the second with a note. */
+function speedSpec(key: 'speed' | 'labSpeed', note?: string): SliderSpec {
+  return {
+    key, min: 0, max: SPEED_STEPS.length - 1, whole: true, ends: ['Every 3s', '30/s'], period: 12000,
+    badge: (v) => formatSpeed(speedAt(v)),
+    caption: (v) => speedCaption(v) + (note ? ` <span class="demo-note">${note}</span>` : ''),
+    draw: speedScene(),
+  };
+}
+
 const SLIDERS: Record<Exclude<DemoKey, 'rules'>, () => SliderSpec> = {
   stickiness: () => {
     const life = scene(12, 4, [[1, 1, 1], [2, 1, 1], [5, 1, 1], [6, 2, 1], [9, 1, 1], [10, 1, 1], [9, 2, 1], [10, 2, 1]]);
@@ -229,16 +239,8 @@ const SLIDERS: Record<Exclude<DemoKey, 'rules'>, () => SliderSpec> = {
       },
     };
   },
-  speed: () => ({
-    key: 'speed', min: 0, max: SPEED_STEPS.length - 1, whole: true, ends: ['Every 3s', '30/s'], period: 12000,
-    badge: (v) => formatSpeed(speedAt(v)), caption: speedCaption, draw: speedScene(),
-  }),
-  labSpeed: () => ({
-    key: 'labSpeed', min: 0, max: SPEED_STEPS.length - 1, whole: true, ends: ['Every 3s', '30/s'], period: 12000,
-    badge: (v) => formatSpeed(speedAt(v)),
-    caption: (v) => `${speedCaption(v)} <span class="demo-note">Only the preview: the board keeps its own speed.</span>`,
-    draw: speedScene(),
-  }),
+  speed: () => speedSpec('speed'),
+  labSpeed: () => speedSpec('labSpeed', 'Only the preview: the board keeps its own speed.'),
   brush: () => {
     const cols = 22;
     const rows = 11;
@@ -279,6 +281,7 @@ class SliderDemo implements Demo {
   private auto = true;
   private t0 = 0;
   private value: number;
+  private lastCaption = '';
 
   constructor(private readonly spec: SliderSpec, private readonly host: DemoHost) {
     this.title = DEMO_TITLES[spec.key];
@@ -339,7 +342,7 @@ class SliderDemo implements Demo {
     if (s) this.spec.draw(s, this.value, now, this.host);
     this.badge.textContent = this.spec.badge(this.value);
     const html = this.spec.caption(this.value);
-    if (this.cap.innerHTML !== html) this.cap.innerHTML = html;
+    if (html !== this.lastCaption) this.cap.innerHTML = this.lastCaption = html;
   }
 }
 
@@ -347,6 +350,35 @@ class SliderDemo implements Demo {
 // The rules player
 
 type StepKey = 'board' | 'focus' | 'count' | 'born' | 'survive' | 'next';
+
+/** The mark on a cell about to die. Red reads as "gone" in every theme, so it isn't a palette colour. */
+const DEATH_MARK = '#D9443A';
+
+/**
+ * How many of each spot's eight neighbours are alive, with spots past the edge counting as empty,
+ * and what each spot becomes under `rule`. The same sums Life.step does without wrapping, kept
+ * apart here because the player shows them.
+ */
+export function generation(cells: ArrayLike<number>, cols: number, rows: number, rule: Rule): { counts: Uint8Array; next: Uint8Array } {
+  const counts = new Uint8Array(cols * rows);
+  const next = new Uint8Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if ((dx || dy) && xx >= 0 && yy >= 0 && xx < cols && yy < rows && cells[yy * cols + xx]) n++;
+        }
+      }
+      const i = y * cols + x;
+      counts[i] = n;
+      next[i] = cells[i] ? (rule.survive.has(n) ? 1 : 0) : (rule.born.has(n) ? 1 : 0);
+    }
+  }
+  return { counts, next };
+}
 
 /** "3", "2 or 3", "3, 6 or 7", "nothing". */
 export function countList(set: ReadonlySet<number>): string {
@@ -382,8 +414,9 @@ class RulesPlayer implements Demo {
   private born = new Set<number>();
   private survive = new Set<number>();
   private sceneName = 'Blinker';
-  private counts = new Uint8Array(PLAYER_COLS * PLAYER_ROWS);
-  private nextCells = new Uint8Array(PLAYER_COLS * PLAYER_ROWS);
+  /** Per spot: live neighbours, and what it becomes next generation (see `generation`). */
+  private counts: Uint8Array = new Uint8Array(0);
+  private nextCells: Uint8Array = new Uint8Array(0);
   private focus = 0;
   private gens = 0;
   private step = 0;
@@ -418,14 +451,13 @@ class RulesPlayer implements Demo {
     this.el.addEventListener('click', (e) => this.onClick(e));
   }
 
-  shown(start = 0): void {
+  shown(start?: string): void {
     const r = this.host.rule();
     this.born = new Set(r.born);
     this.survive = new Set(r.survive);
     this.load();
     this.playing = !this.host.reducedMotion();
-    this.goto(start);
-    // Opening on a later step: show it on a board that's ready for it.
+    this.goto(Math.max(0, STEPS.findIndex((s) => s.key === start)));
     this.last = performance.now();
   }
 
@@ -440,24 +472,10 @@ class RulesPlayer implements Demo {
     this.compute();
   }
 
-  /** Counts and the coming generation for the board as it stands (edges count as empty). */
+  /** Counts and the coming generation for the board as it stands. */
   private compute(): void {
     const { cols, rows, cur } = this.life;
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        let n = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const xx = x + dx;
-            const yy = y + dy;
-            if ((dx || dy) && xx >= 0 && yy >= 0 && xx < cols && yy < rows && cur[yy * cols + xx]) n++;
-          }
-        }
-        const i = y * cols + x;
-        this.counts[i] = n;
-        this.nextCells[i] = cur[i] ? (this.survive.has(n) ? 1 : 0) : (this.born.has(n) ? 1 : 0);
-      }
-    }
+    ({ counts: this.counts, next: this.nextCells } = generation(cur, cols, rows, this.rule));
     // The spot counted by hand: one about to be born if there is one, else a living cell.
     let f = this.nextCells.findIndex((v, i) => v > 0 && !cur[i]);
     if (f < 0) f = cur.findIndex((v) => v > 0);
@@ -678,7 +696,7 @@ class RulesPlayer implements Demo {
           num(i, n, pal.panel, 0.9);
           const d = R * 0.7;
           ctx.globalAlpha = e;
-          ctx.strokeStyle = '#D9443A';
+          ctx.strokeStyle = DEATH_MARK;
           ctx.lineWidth = 3;
           ctx.lineCap = 'round';
           ctx.beginPath();

@@ -155,8 +155,8 @@
         <span class="preview-gen" id="labGen">Gen 0</span>
       </div>
       <div class="group"><div class="slider"><h3><label for="labSpeed">Preview speed</label><button type="button" class="info-dot" data-demo="labSpeed" aria-label="Show what preview speed does"></button><output id="labSpeedOut" for="labSpeed"></output></h3><input type="range" id="labSpeed"></div></div>
-      <div class="group"><h3>Born with<button type="button" class="info-dot" data-demo="rules" data-start="3" aria-label="Watch how born with works"></button><small>An empty spot comes alive</small></h3><div class="counts" id="labBorn"></div></div>
-      <div class="group"><h3>Survives with<button type="button" class="info-dot" data-demo="rules" data-start="4" aria-label="Watch how survives with works"></button><small>A living cell stays alive</small></h3><div class="counts" id="labSurvive"></div></div>
+      <div class="group"><h3>Born with<button type="button" class="info-dot" data-demo="rules" data-start="born" aria-label="Watch how born with works"></button><small>An empty spot comes alive</small></h3><div class="counts born" id="labBorn"></div></div>
+      <div class="group"><h3>Survives with<button type="button" class="info-dot" data-demo="rules" data-start="survive" aria-label="Watch how survives with works"></button><small>A living cell stays alive</small></h3><div class="counts" id="labSurvive"></div></div>
       <p class="rule-line" id="labLine"></p>
       <div class="lab-actions">
         <button type="button" class="ghost" id="labMutate">
@@ -187,7 +187,7 @@
         <h2 id="labInfoTitle">How rules work</h2>
       </div>
       <div class="panel-body info">
-        <button type="button" class="pill pill-wide watch" data-demo="rules" data-start="0">
+        <button type="button" class="pill pill-wide watch" data-demo="rules">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l10.4-6.8a1 1 0 0 0 0-1.72L9.5 4.34A1 1 0 0 0 8 5.2Z"/></svg>Watch a generation, step by step
         </button>
         <figure class="hood">
