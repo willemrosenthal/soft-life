@@ -1,6 +1,16 @@
 /** The pattern library: classic Life patterns, 'O' = live cell. */
 export type PatternCategory = 'Spaceship' | 'Oscillator' | 'Still life' | 'Methuselah' | 'Gun' | 'Growth';
 
+/** What each category means, shown under the chips when that category is picked. */
+export const CATEGORY_INFO: Record<PatternCategory, string> = {
+  Spaceship: 'Shapes that rebuild themselves one step over, so they glide across the board forever.',
+  Oscillator: 'Shapes that cycle through a loop of forms and return to where they started, staying in place.',
+  'Still life': 'Shapes that never change: every live cell has just enough neighbours to survive, and no new ones are born.',
+  Methuselah: 'Tiny seeds that churn for hundreds or thousands of generations before settling down.',
+  Gun: 'Machines that stay put and fire a fresh spaceship every cycle, so the population grows without end.',
+  Growth: 'Patterns that keep spreading and leave a trail of debris behind them, some of them forever.',
+};
+
 export interface Pattern {
   name: string;
   category: PatternCategory;

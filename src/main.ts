@@ -15,7 +15,7 @@ import {
   CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, surpriseTheme, hardToSee, isDark, isHex, loadThemes, nextThemeName, resolvePalette, saveThemes, standOut, themeKey,
   type CustomTheme,
 } from './themes';
-import { PATTERNS, type PatternCategory } from './patterns';
+import { CATEGORY_INFO, PATTERNS, type PatternCategory } from './patterns';
 import { BoardRenderer, drawCells, type View } from './render';
 import { MiniBoard } from './miniboard';
 import {
@@ -706,6 +706,9 @@ chips.addEventListener('click', (e) => {
   if (!chip) return;
   category = chip.dataset.cat as PatternCategory | 'all';
   for (const c of chips.querySelectorAll('[data-cat]')) c.setAttribute('aria-pressed', String(c === chip));
+  const info = el('#catInfo');
+  info.textContent = category === 'all' ? '' : CATEGORY_INFO[category];
+  info.hidden = category === 'all';
   buildLibrary();
 });
 
