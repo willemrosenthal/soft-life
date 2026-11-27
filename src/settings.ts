@@ -34,7 +34,13 @@ export interface Settings {
   brushSize: number;
   /** The tool rail tucked away off the right edge. */
   railHidden: boolean;
+  /** The cell style preview in Settings: still shapes, or a live board at the board's speed. */
+  stylePreview: StylePreview;
+  /** Whether the cell style preview is showing; it starts hidden behind a button. */
+  stylePreviewShown: boolean;
 }
+
+export type StylePreview = 'shapes' | 'live';
 
 export const SPEED_MIN = 1;
 export const SPEED_MAX = 30;
@@ -55,10 +61,12 @@ export const DENSITY_MAX = 48;
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
   wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
+  stylePreview: 'shapes', stylePreviewShown: false,
 };
 
 const STYLES: readonly CellStyle[] = ['goo', 'dots', 'pixels'];
 const MODES: readonly ColourMode[] = ['colonies', 'solo', 'age'];
+const PREVIEWS: readonly StylePreview[] = ['shapes', 'live'];
 const KEY = 'softlife:settings';
 
 /** Saved data may be from an older version or damaged: anything unusable falls back to its default. */
@@ -86,6 +94,8 @@ export function parseSettings(value: unknown): Settings {
     gaps: int(v.gaps, GAPS_MIN, GAPS_MAX, d.gaps),
     brushSize: int(v.brushSize, BRUSH_MIN, BRUSH_MAX, d.brushSize),
     railHidden: flag(v.railHidden, d.railHidden),
+    stylePreview: oneOf(v.stylePreview, PREVIEWS, d.stylePreview),
+    stylePreviewShown: flag(v.stylePreviewShown, d.stylePreviewShown),
   };
 }
 

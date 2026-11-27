@@ -177,6 +177,22 @@ svg { display: block; }
 .preview { position: relative; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 18px; overflow: hidden; background: var(--app-bg); box-shadow: inset 0 0 0 1px var(--app-line); }
 .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .preview-wide { aspect-ratio: 9 / 5; }
+/* Controls over a preview: a Shapes / Live switch at the top left, buttons at the top right. */
+.preview-seg {
+  position: absolute; top: 8px; left: 8px; display: flex; gap: 2px; padding: 3px; border-radius: 99px;
+  background: color-mix(in srgb, var(--app-panel) 88%, transparent); box-shadow: var(--float-shadow);
+}
+.preview-seg button { border: 0; background: none; padding: 4px 10px; border-radius: 99px; font: 600 11px var(--body); cursor: pointer; }
+.preview-seg button[aria-pressed="true"] { background: var(--app-fg); color: var(--app-bg); }
+.preview-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+.preview .preview-tools .ib { position: static; }
+/* Show / hide the cell style preview. */
+.preview-toggle {
+  justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 2px; border: 0; background: none; cursor: pointer;
+  font: 600 12px var(--body); color: var(--app-accent);
+}
+.preview-toggle svg { width: 13px; height: 13px; transition: transform .2s var(--ease); }
+.preview-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
 /* Not --glass: that's worked out at the root, and the theme editor wears its own colours. */
 .preview .ib { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; background: color-mix(in srgb, var(--app-panel) 88%, transparent); }
 .preview .ib svg { width: 16px; height: 16px; }

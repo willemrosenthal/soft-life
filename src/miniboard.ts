@@ -45,6 +45,12 @@ export class MiniBoard {
     this.dirty = true;
   }
 
+  /** Change the grid's size (it comes back empty-edged; refill it as needed) and refit the canvas. */
+  resize(cols: number, rows: number): void {
+    this.life.resize(cols, rows);
+    this.fit();
+  }
+
   /** Fresh random soup, starting a full beat from now. */
   restart(): void {
     this.life.soup();

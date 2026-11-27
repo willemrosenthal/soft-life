@@ -291,7 +291,7 @@ function panelToggled(panel: HTMLElement, opener: HTMLElement, open: boolean): v
     closePops();
     el<HTMLElement>('[data-close]', panel).focus({ preventScroll: true });
     if (panel === libPanel) drawThumbnails();
-    if (panel === setPanel) restartStylePreview();
+    if (panel === setPanel) resetStylePreview();
     if (panel === labPanel) labBoard.fit();
   } else if (panel.contains(document.activeElement)) {
     opener.focus({ preventScroll: true });
@@ -483,33 +483,75 @@ const redrawBoards = () => {
   dirty = true;
 };
 
-// The cell style preview in Settings: the board in the current look, since the panel hides most of
-// the real one. While a slider is being dragged it holds still, so shapes can be compared.
-const STYLE_PREVIEW_COLS = 18;
-const STYLE_PREVIEW_ROWS = 10;
-const STYLE_PREVIEW_SPEED = 4;
-/** How long after the last slider movement the preview stays still (ms). */
-const STYLE_PREVIEW_HOLD = 1200;
-const styleBoard = miniBoard(el<HTMLCanvasElement>('#styleCv'), STYLE_PREVIEW_COLS, STYLE_PREVIEW_ROWS);
+// The cell style preview in Settings, since the panel hides most of the real board. It starts
+// hidden behind a button. "Shapes" is a few unmoving shapes, each showing off a slider: one-colour
+// shapes for stickiness, colours side by side for melt, mixed-colour blocks for gaps. "Live" is a
+// soup at the board's own speed.
+/** [x, y, colony]. Rows 0–1 stay clear for the controls over the preview. */
+const STYLE_SHAPES: readonly (readonly [number, number, number])[] = [
+  [1, 2, 1], [1, 3, 1], [2, 3, 1], [3, 3, 1], // an L
+  [6, 2, 1], [7, 3, 1], // a diagonal pair
+  [10, 2, 2], [11, 2, 2], [10, 3, 2], [11, 3, 2], // a block
+  [14, 2, 1], [15, 2, 5], [14, 3, 5], [15, 3, 1], // a mixed block
+  [1, 6, 3], [2, 6, 3], [3, 6, 6], [4, 6, 6], // two colours side by side
+  [7, 6, 4], [8, 6, 4], [9, 6, 4], // a line
+  [13, 6, 6], [14, 6, 2], [13, 7, 2], [14, 7, 6], [15, 7, 6], // a mixed block with a tail
+];
+/** Grid sizes [cols, rows] for each mode. */
+const STYLE_GRID = { shapes: [17, 9], live: [18, 10] } as const;
+
+const stylePreviewEl = el('#stylePreview');
+const styleShow = el('#styleShow');
+const styleSoup = el('#styleSoup');
+const styleBoard = miniBoard(el<HTMLCanvasElement>('#styleCv'), STYLE_GRID.shapes[0], STYLE_GRID.shapes[1]);
 const styleQuiet = new QuietWatcher();
-let styleHeldAt = -Infinity;
 
-function restartStylePreview(): void {
-  styleBoard.restart();
-  styleQuiet.reset();
-}
-el('#styleSoup').addEventListener('click', restartStylePreview);
-setPanel.addEventListener('input', (e) => {
-  if ((e.target as Element).matches('input[type="range"]')) styleHeldAt = performance.now();
-});
-
-/** Called from the main loop while Settings is showing. Starts afresh once it has gone quiet. */
-function runStylePreview(now: number): void {
-  const speed = now - styleHeldAt < STYLE_PREVIEW_HOLD ? 0 : STYLE_PREVIEW_SPEED; // 0: no steps, still redraws
-  if (styleBoard.run(now, rule, speed, palette(), { ...settings, wrap: true }) && styleQuiet.update(styleBoard.life.cur)) {
-    restartStylePreview();
+/** Show or hide the preview, fill it for its mode (the shapes, or fresh soup) and set the controls to match. */
+function resetStylePreview(): void {
+  const { stylePreview: mode, stylePreviewShown: shown } = settings;
+  stylePreviewEl.hidden = !shown;
+  styleShow.setAttribute('aria-expanded', String(shown));
+  el('span', styleShow).textContent = shown ? 'Hide preview' : 'Show preview';
+  for (const b of stylePreviewEl.querySelectorAll<HTMLElement>('[data-preview]')) b.setAttribute('aria-pressed', String(b.dataset.preview === mode));
+  styleSoup.hidden = mode !== 'live';
+  if (!shown) return;
+  const [cols, rows] = STYLE_GRID[mode];
+  styleBoard.resize(cols, rows);
+  if (mode === 'live') {
+    styleBoard.restart();
+    styleQuiet.reset();
+  } else {
+    styleBoard.life.clear();
+    for (const [x, y, c] of STYLE_SHAPES) styleBoard.life.setCell(y * cols + x, c);
+    styleBoard.invalidate();
   }
 }
+
+styleShow.addEventListener('click', () => {
+  settings.stylePreviewShown = !settings.stylePreviewShown;
+  save();
+  resetStylePreview();
+});
+stylePreviewEl.addEventListener('click', (e) => {
+  const t = e.target as Element;
+  const mode = t.closest<HTMLElement>('[data-preview]')?.dataset.preview as Settings['stylePreview'] | undefined;
+  if (mode) settings.stylePreview = mode;
+  else if (!t.closest('#styleSoup')) return;
+  save();
+  resetStylePreview();
+});
+
+/** Called from the main loop while Settings is showing. Shapes never step (speed 0); live starts afresh once quiet. */
+function runStylePreview(now: number): void {
+  if (!settings.stylePreviewShown) return;
+  if (settings.stylePreview === 'shapes') {
+    styleBoard.run(now, rule, 0, palette(), { ...settings, critters: false, wrap: false });
+  } else if (styleBoard.run(now, rule, settings.speed, palette(), { ...settings, wrap: true }) && styleQuiet.update(styleBoard.life.cur)) {
+    styleBoard.restart();
+    styleQuiet.reset();
+  }
+}
+resetStylePreview();
 bindRange('melt', 'melt', MELT_MIN, MELT_MAX, redrawBoards);
 bindRange('gaps', 'gaps', GAPS_MIN, GAPS_MAX, redrawBoards);
 syncGoo();
