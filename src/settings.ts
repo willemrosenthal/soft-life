@@ -2,6 +2,7 @@ import { BRUSH_MAX, BRUSH_MIN } from './brush';
 import { parseRule } from './life';
 import { isPaletteId, type PaletteId } from './palettes';
 import type { CellStyle, ColourMode } from './render';
+import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 
 /** Everything remembered between visits. The board itself isn't saved; share a link for that. */
 export interface Settings {
@@ -16,6 +17,8 @@ export interface Settings {
   speed: number;
   /** Dots across the screen. */
   density: number;
+  /** Goo style: how readily neighbours melt together, 0 (tight) to 100 (gloopy). */
+  stickiness: number;
   /** How many dots wide a stroke draws. */
   brushSize: number;
   /** The tool rail tucked away off the right edge. */
@@ -29,7 +32,7 @@ export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, smooth: true, speed: 8, density: 26, brushSize: 1, railHidden: false,
+  wrap: true, critters: true, smooth: true, speed: 8, density: 26, stickiness: 50, brushSize: 1, railHidden: false,
 };
 
 const STYLES: readonly CellStyle[] = ['goo', 'dots', 'pixels'];
@@ -54,6 +57,7 @@ export function parseSettings(value: unknown): Settings {
     smooth: flag(v.smooth, d.smooth),
     speed: int(v.speed, SPEED_MIN, SPEED_MAX, d.speed),
     density: int(v.density, DENSITY_MIN, DENSITY_MAX, d.density),
+    stickiness: int(v.stickiness, STICKINESS_MIN, STICKINESS_MAX, d.stickiness),
     brushSize: int(v.brushSize, BRUSH_MIN, BRUSH_MAX, d.brushSize),
     railHidden: flag(v.railHidden, d.railHidden),
   };

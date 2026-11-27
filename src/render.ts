@@ -1,48 +1,18 @@
 import { Critters } from './critters';
 import type { Life } from './life';
 import type { Palette } from './palettes';
+import { RADIUS, traceSlime } from './slime';
 
 /**
- * Drawing. The simulation is plain Life; only the picture is soft. Each live cell is a circle,
- * same-coloured side-by-side cells get a curved neck between them, and full 2×2 blocks get their
- * middle filled, so neighbours read as one blob. Every colour goes into one Path2D and is filled
- * in a single call, which keeps it fast on phones.
+ * Drawing. The simulation is plain Life; only the picture is soft. In the goo style, same-coloured
+ * neighbours melt into one blob (see slime.ts); the other styles draw each cell alone. Every colour
+ * goes into one Path2D and is filled in a single call, which keeps it fast on phones.
  */
 
 export type CellStyle = 'goo' | 'dots' | 'pixels';
 export type ColourMode = 'colonies' | 'solo' | 'age';
 
 const TAU = Math.PI * 2;
-/** Circle radius and neck waist, as fractions of a cell. */
-const RADIUS = 0.47;
-const WAIST = 0.29;
-
-/**
- * Add the neck joining the cell centred at (ax, ay) to its right-hand neighbour (or the one below,
- * when `vertical`). `k` scales it while cells grow in or melt away. The neck's sides are arcs that
- * meet both circles at a tangent, so the outline has no corners.
- */
-function neck(p: Path2D, ax: number, ay: number, c: number, vertical: boolean, k: number): void {
-  const R = RADIUS * c * k;
-  const w = WAIST * c * k;
-  const f = (c * c / 4 + w * w - R * R) / (2 * (R - w));
-  const d = w + f;
-  const q = R / (R + f);
-  const h = c / 2;
-  const aL = Math.atan2(d, -h);
-  const aR = Math.atan2(d, h);
-  const rot = vertical ? Math.PI / 2 : 0;
-  const T = vertical ? (lx: number, ly: number) => [ax - ly, ay + lx] as const : (lx: number, ly: number) => [ax + lx, ay + ly] as const;
-  let P = T(h * q, -d * q);
-  p.moveTo(P[0], P[1]);
-  P = T(h, -d);
-  p.arc(P[0], P[1], f, aL + rot, aR + rot, true);
-  P = T(c - h * q, d * q);
-  p.lineTo(P[0], P[1]);
-  P = T(h, d);
-  p.arc(P[0], P[1], f, -aR + rot, -aL + rot, true);
-  p.closePath();
-}
 
 export interface CellLayer {
   cols: number;
@@ -57,20 +27,32 @@ export interface CellLayer {
   colour: ArrayLike<number>;
   colours: readonly string[];
   style: CellStyle;
+  /** Goo only: 0 (tight) to 100 (gloopy). Default 50. */
+  stickiness?: number;
+  /** Goo only: blobs reach across the edges. */
+  wrap?: boolean;
 }
 
 /** Draw cells in the chosen style. Shared by the board, the library thumbnails and the logo. */
 export function drawCells(ctx: CanvasRenderingContext2D, g: CellLayer): void {
+  fillCells(ctx, cellPaths(g), g);
+}
+
+/** One path per colour. Goo outlines can contain holes, filled by the even-odd rule. */
+function cellPaths(g: CellLayer): Path2D[] {
   const { cols, rows, cell: c, ox, oy, size, colour, colours, style } = g;
   const paths = colours.map(() => new Path2D());
+  if (style === 'goo') {
+    traceSlime({ cols, rows, cell: c, ox, oy, size, colour, wrap: g.wrap ?? false }, colours.length, g.stickiness ?? 50, (k) => paths[k]!);
+    return paths;
+  }
   const R = RADIUS * c;
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
       const s = size[i]!;
       if (s <= 0) continue;
-      const col = colour[i]!;
-      const p = paths[col]!;
+      const p = paths[colour[i]!]!;
       const cx = ox + (x + 0.5) * c;
       const cy = oy + (y + 0.5) * c;
       if (style === 'pixels') {
@@ -81,18 +63,16 @@ export function drawCells(ctx: CanvasRenderingContext2D, g: CellLayer): void {
       const r = R * s;
       p.moveTo(cx + r, cy);
       p.arc(cx, cy, r, 0, TAU);
-      if (style !== 'goo') continue;
-      const right = x + 1 < cols && size[i + 1]! > 0 && colour[i + 1] === col;
-      const down = y + 1 < rows && size[i + cols]! > 0 && colour[i + cols] === col;
-      if (right) neck(p, cx, cy, c, false, Math.min(s, size[i + 1]!, 1));
-      if (down) neck(p, cx, cy, c, true, Math.min(s, size[i + cols]!, 1));
-      const full = (j: number) => size[j]! > 0.98;
-      if (right && down && full(i) && full(i + 1) && full(i + cols) && full(i + cols + 1) && colour[i + cols + 1] === col) p.rect(cx, cy, c, c);
     }
   }
-  colours.forEach((fill, k) => {
+  return paths;
+}
+
+function fillCells(ctx: CanvasRenderingContext2D, paths: readonly Path2D[], g: CellLayer): void {
+  const rule = g.style === 'goo' ? 'evenodd' : 'nonzero';
+  g.colours.forEach((fill, k) => {
     ctx.fillStyle = fill;
-    ctx.fill(paths[k]!);
+    ctx.fill(paths[k]!, rule);
   });
 }
 
@@ -109,6 +89,8 @@ export interface Look {
   style: CellStyle;
   mode: ColourMode;
   critters: boolean;
+  stickiness: number;
+  wrap: boolean;
 }
 
 /** Age (generations alive) → index into a palette's `age` colours. */
@@ -116,6 +98,12 @@ const ageBucket = (a: number) => (a <= 1 ? 0 : a <= 3 ? 1 : a <= 9 ? 2 : a <= 29
 /** Newborns overshoot a little and settle (ease-out-back); the dying shrink smoothly. */
 const grow = (t: number) => { const u = t - 1; return 1 + 2.5 * u * u * u + 1.5 * u * u; };
 const shrink = (t: number) => 1 - t * t * (3 - 2 * t);
+
+const sameCells = (a: ArrayLike<number>, b: ArrayLike<number>) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
 
 /** Draws the live board. Holds per-cell scratch arrays so the cells allocate nothing per frame. */
 export class BoardRenderer {
@@ -125,6 +113,10 @@ export class BoardRenderer {
   readonly critters = new Critters();
   /** Where the brush would draw, shown as a dashed ring; null hides it. */
   brushRing: BrushRing | null = null;
+  private paths: Path2D[] | null = null;
+  private pathsKey = '';
+  private lastSize = new Float32Array(0);
+  private lastColour = new Int8Array(0);
 
   /**
    * `t` runs 0 → 1 between generations: how far cells have grown in or melted away. `now` is the
@@ -168,7 +160,17 @@ export class BoardRenderer {
     ctx.fill(dots);
 
     const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
-    drawCells(ctx, { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style });
+    const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, wrap: look.wrap };
+    // Critters redraw the board every frame even when nothing moves: reuse the outline then,
+    // since tracing goo is the costly part.
+    const key = `${look.style} ${look.stickiness} ${look.wrap} ${colours.length} ${c} ${ox} ${oy}`;
+    if (!this.paths || key !== this.pathsKey || !sameCells(size, this.lastSize) || !sameCells(colour, this.lastColour)) {
+      this.paths = cellPaths(layer);
+      this.pathsKey = key;
+      this.lastSize = size.slice();
+      this.lastColour = colour.slice();
+    }
+    fillCells(ctx, this.paths, layer);
 
     if (look.critters) {
       this.critters.draw(ctx, {

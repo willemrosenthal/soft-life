@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest';
+import { RADIUS, traceSlime, type PathSink } from '../src/slime';
+
+const CELL = 24;
+
+/** Records each closed loop as its list of curve endpoints. */
+class Recorder implements PathSink {
+  loops: [number, number][][] = [];
+  moveTo(x: number, y: number) { this.loops.push([[x, y]]); }
+  quadraticCurveTo(_cx: number, _cy: number, x: number, y: number) { this.loops.at(-1)!.push([x, y]); }
+  closePath() {}
+}
+
+/** Trace a board given as rows of characters: '.' empty, digits are colours at full size. */
+function trace(rows: string[], opts: { stickiness?: number; wrap?: boolean; sizes?: Record<number, number>; colours?: number } = {}) {
+  const cols = rows[0]!.length;
+  const size = new Float32Array(cols * rows.length);
+  const colour = new Int8Array(cols * rows.length);
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch === '.') return;
+    size[y * cols + x] = 1;
+    colour[y * cols + x] = Number(ch);
+  }));
+  for (const [i, s] of Object.entries(opts.sizes ?? {})) size[Number(i)] = s;
+  const n = opts.colours ?? 1;
+  const sinks = Array.from({ length: n }, () => new Recorder());
+  traceSlime({ cols, rows: rows.length, cell: CELL, ox: 0, oy: 0, size, colour, wrap: opts.wrap ?? false }, n, opts.stickiness ?? 50, (k) => sinks[k]!);
+  return sinks;
+}
+
+describe('traceSlime', () => {
+  it('draws a lone cell as a circle of the usual radius', () => {
+    const [s] = trace(['...', '.0.', '...']);
+    expect(s!.loops).toHaveLength(1);
+    for (const [x, y] of s!.loops[0]!) expect(Math.hypot(x - 1.5 * CELL, y - 1.5 * CELL)).toBeCloseTo(RADIUS * CELL, -0.5);
+  });
+
+  it('joins side-by-side cells into one blob, at any stickiness', () => {
+    for (const stickiness of [0, 50, 100]) {
+      expect(trace(['....', '.00.', '....'], { stickiness })[0]!.loops).toHaveLength(1);
+      expect(trace(['...', '.0.', '.0.', '...'], { stickiness })[0]!.loops).toHaveLength(1);
+    }
+  });
+
+  it('keeps diagonal neighbours apart, at any stickiness', () => {
+    for (const stickiness of [0, 50, 100]) expect(trace(['....', '.0..', '..0.', '....'], { stickiness })[0]!.loops).toHaveLength(2);
+  });
+
+  it('fills a 2×2 block with no hole in the middle', () => {
+    for (const stickiness of [0, 50, 100]) expect(trace(['....', '.00.', '.00.', '....'], { stickiness })[0]!.loops).toHaveLength(1);
+  });
+
+  it('leaves a hole inside a ring', () => {
+    expect(trace(['.....', '.000.', '.0.0.', '.000.', '.....'])[0]!.loops).toHaveLength(2);
+  });
+
+  it('pinches off a neighbour that is nearly gone, and joins one that is nearly full', () => {
+    const board = ['....', '.00.', '....'];
+    expect(trace(board, { sizes: { 6: 0.15 } })[0]!.loops).toHaveLength(2);
+    expect(trace(board, { sizes: { 6: 0.9 } })[0]!.loops).toHaveLength(1);
+  });
+
+  it('does not join diagonal cells while the other two of their block are tiny', () => {
+    // Cells 5 and 10 full, 6 and 9 just appearing: four separate lumps.
+    for (const stickiness of [0, 50, 100]) expect(trace(['....', '.00.', '.00.', '....'], { stickiness, sizes: { 6: 0.1, 9: 0.1 } })[0]!.loops).toHaveLength(4);
+  });
+
+  it('never joins different colours', () => {
+    const [a, b] = trace(['....', '.01.', '....'], { colours: 2 });
+    expect(a!.loops).toHaveLength(1);
+    expect(b!.loops).toHaveLength(1);
+  });
+
+  it('reaches across the edges when wrapping', () => {
+    const board = ['.....', '0...0', '.....'];
+    const minX = (wrap: boolean) => Math.min(...trace(board, { wrap })[0]!.loops.flat().map(([x]) => x));
+    expect(minX(false)).toBeGreaterThan(0);
+    expect(minX(true)).toBeLessThan(-0.5 * CELL);
+  });
+
+  it('gives the same result when called again (scratch is cleaned up)', () => {
+    const board = ['.....', '.00..', '.0.0.', '.....'];
+    expect(trace(board)[0]!.loops).toEqual(trace(board)[0]!.loops);
+  });
+});

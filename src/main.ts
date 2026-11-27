@@ -16,6 +16,7 @@ import {
   saveRules, seededRandom, type SavedRule, type Trend,
 } from './rules';
 import { DENSITY_MAX, DENSITY_MIN, loadSettings, saveSettings, type Settings } from './settings';
+import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
 
 /** Wait this long after the board stops changing size before adding or removing rows. */
@@ -359,7 +360,7 @@ el('#btnClear').addEventListener('click', () => {
 el('#btnShare').addEventListener('click', () => void share());
 
 /** A range input bound to a numeric setting, with its readout. */
-function bindRange(id: string, key: 'speed' | 'density' | 'brushSize', min: number, max: number, onChange: () => void): HTMLInputElement {
+function bindRange(id: string, key: 'speed' | 'density' | 'brushSize' | 'stickiness', min: number, max: number, onChange: () => void): HTMLInputElement {
   const input = el<HTMLInputElement>(`#${id}`);
   input.min = String(min);
   input.max = String(max);
@@ -395,6 +396,20 @@ bindRange('density', 'density', DENSITY_MIN, DENSITY_MAX, () => {
 });
 bindRange('size', 'brushSize', BRUSH_MIN, BRUSH_MAX, syncSize);
 
+const stickyRow = el('#stickyRow');
+const stickyOut = el('#stickyOut');
+/** Stickiness only means something in the goo style. */
+function syncSticky(): void {
+  stickyRow.hidden = settings.style !== 'goo';
+  const v = settings.stickiness;
+  stickyOut.textContent = v < 25 ? 'Tight' : v < 45 ? 'Soft' : v < 65 ? 'Gooey' : v < 85 ? 'Gloopy' : 'Sticky';
+}
+bindRange('stickiness', 'stickiness', STICKINESS_MIN, STICKINESS_MAX, () => {
+  syncSticky();
+  restyle();
+});
+syncSticky();
+
 /** The brush's footprint, drawn in the current colour (or grey for the eraser). */
 function drawBrushPreview(): void {
   const c = el<HTMLCanvasElement>('#sizePreview');
@@ -408,7 +423,7 @@ function drawBrushPreview(): void {
   g.clearRect(0, 0, w, w);
   drawCells(g, {
     cols: n, rows: n, cell, ox: offset, oy: offset, size, colour: new Int8Array(n * n),
-    colours: [brush === 'erase' ? palette().muted : palette().cells[brush]!], style: settings.style,
+    colours: [brush === 'erase' ? palette().muted : palette().cells[brush]!], style: settings.style, stickiness: settings.stickiness,
   });
 }
 
@@ -492,7 +507,7 @@ function drawThumbnails(): void {
     g.fillRect(0, 0, w, h);
     drawCells(g, {
       cols, rows, cell, ox: (w - cols * cell) / 2, oy: (h - rows * cell) / 2,
-      size, colour: new Int8Array(cols * rows), colours: [palette().cells[patternColony(index) - 1]!], style: settings.style,
+      size, colour: new Int8Array(cols * rows), colours: [palette().cells[patternColony(index) - 1]!], style: settings.style, stickiness: settings.stickiness,
     });
   }
 }
@@ -549,6 +564,15 @@ themesBox.addEventListener('click', (e) => {
   applyTheme();
 });
 
+/** Redraw everything that shows cells after the cell style or stickiness changes. */
+function restyle(): void {
+  drawThumbnails();
+  drawRuleThumbnails();
+  drawBrushPreview();
+  labDirty = true;
+  dirty = true;
+}
+
 /** Reflect the settings in the panel's buttons. */
 function syncSettingsPanel(): void {
   for (const group of setPanel.querySelectorAll<HTMLElement>('[data-key]')) {
@@ -571,9 +595,8 @@ setPanel.addEventListener('click', (e) => {
       setBoardRule(value);
     } else if (key === 'style') {
       settings.style = value as Settings['style'];
-      drawThumbnails();
-      drawRuleThumbnails();
-      drawBrushPreview();
+      syncSticky();
+      restyle();
     } else {
       settings.mode = value as Settings['mode'];
     }
@@ -709,7 +732,7 @@ function runPreview(now: number): void {
   }
   const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - labLastStep) / (interval * 0.85));
   if (t < 1 || labLastT < 1 || labDirty) {
-    previewRenderer.draw(labCtx, preview, previewView, palette(), { style: settings.style, mode: settings.mode, critters: false }, t, now);
+    previewRenderer.draw(labCtx, preview, previewView, palette(), { style: settings.style, mode: settings.mode, critters: false, stickiness: settings.stickiness, wrap: true }, t, now);
     labDirty = false;
   }
   labLastT = t;
@@ -873,7 +896,7 @@ function drawRuleThumbnails(): void {
     }
     g.fillStyle = palette().bg;
     g.fillRect(0, 0, w, h);
-    drawCells(g, { cols: THUMB_COLS, rows: THUMB_ROWS, cell, ox: (w - THUMB_COLS * cell) / 2, oy: (h - THUMB_ROWS * cell) / 2, size, colour, colours: palette().cells, style: settings.style });
+    drawCells(g, { cols: THUMB_COLS, rows: THUMB_ROWS, cell, ox: (w - THUMB_COLS * cell) / 2, oy: (h - THUMB_ROWS * cell) / 2, size, colour, colours: palette().cells, style: settings.style, stickiness: settings.stickiness, wrap: true });
   }
 }
 
