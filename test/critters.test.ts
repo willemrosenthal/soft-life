@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRITTER_AGE, Critters, creaseColour, findSpots, positionHash } from '../src/critters';
+import { CRITTER_AGE, Critters, creaseColour, critterOdds, findSpots, positionHash } from '../src/critters';
 import { Life, parseRule } from '../src/life';
 
 const CONWAY = parseRule('B3/S23')!;
@@ -47,6 +47,18 @@ describe('findSpots', () => {
     const life = blocks(CRITTER_AGE + 2);
     expect(findSpots(life, true)).toEqual(findSpots(life, true));
     expect(findSpots(life, false).every((s) => s.kind === 'single')).toBe(true);
+  });
+
+  it('finds more critters, on younger cells, as abundance goes up', () => {
+    const lo = critterOdds(0), hi = critterOdds(100);
+    expect(hi.age).toBeLessThan(lo.age);
+    expect(hi.single).toBeGreaterThan(lo.single);
+    expect(hi.pair).toBeGreaterThan(lo.pair);
+    const young = blocks(hi.age);
+    expect(findSpots(young, true, lo)).toEqual([]);
+    expect(findSpots(young, true, hi).length).toBeGreaterThan(0);
+    const old = blocks(lo.age + 2);
+    expect(findSpots(old, true, hi).length).toBeGreaterThan(findSpots(old, true, lo).length);
   });
 });
 

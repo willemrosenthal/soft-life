@@ -11,11 +11,33 @@ import type { Life } from './life';
  */
 
 const TAU = Math.PI * 2;
-/** A cell must have been alive this many generations before it can open an eye. */
-export const CRITTER_AGE = 18;
-/** Share of qualifying cells that open an eye, and of qualifying still blocks that get a face. */
-const SINGLE_CHANCE = 0.2;
-const PAIR_CHANCE = 0.55;
+export const ABUNDANCE_MIN = 0;
+export const ABUNDANCE_MAX = 100;
+export const DEFAULT_ABUNDANCE = 60;
+
+export interface CritterOdds {
+  /** A cell must have been alive this many generations before it can open an eye. */
+  age: number;
+  /** Share of qualifying cells that open an eye, and of qualifying still blocks that get a face. */
+  single: number;
+  pair: number;
+}
+
+/**
+ * How readily critters appear, from the 0–100 abundance setting. More abundant critters need less
+ * stability: at the top a cell only has to survive a few generations, so eyes show up in busy,
+ * chaotic regions too, not just on still lifes.
+ */
+export function critterOdds(abundance: number): CritterOdds {
+  const e = Math.max(0, Math.min(1, abundance / 100));
+  return {
+    age: Math.round(36 - 33 * e),
+    single: 0.03 + 0.62 * e,
+    pair: Math.min(1, 0.15 + 0.85 * e),
+  };
+}
+/** The age a cell needs at the default abundance. */
+export const CRITTER_AGE = critterOdds(DEFAULT_ABUNDANCE).age;
 /** Eye radius (lids included), as a fraction of a cell. Cells are drawn at 0.47. */
 const EYE = 0.437;
 const EYE_MAX = 0.46;
@@ -85,9 +107,9 @@ export interface Spot {
  * Which cells have a critter right now. Fixed by position, so eyes don't flicker. Pairs only in the
  * goo style, where a block is drawn as one solid blob.
  */
-export function findSpots(life: Life, pairs: boolean): Spot[] {
+export function findSpots(life: Life, pairs: boolean, odds: CritterOdds = critterOdds(DEFAULT_ABUNDANCE)): Spot[] {
   const { cols, rows, cur, prev, ages } = life;
-  const ok = (i: number) => cur[i]! > 0 && prev[i]! > 0 && ages[i]! >= CRITTER_AGE;
+  const ok = (i: number) => cur[i]! > 0 && prev[i]! > 0 && ages[i]! >= odds.age;
   const spots: Spot[] = [];
   const used = new Uint8Array(cols * rows);
   if (pairs) {
@@ -95,7 +117,7 @@ export function findSpots(life: Life, pairs: boolean): Spot[] {
       for (let x = 0; x < cols - 1; x++) {
         const i = y * cols + x;
         // Cheap checks first: this runs every frame, over every cell.
-        if (!ok(i) || used[i] || positionHash(x, y + 99) >= PAIR_CHANCE) continue;
+        if (!ok(i) || used[i] || positionHash(x, y + 99) >= odds.pair) continue;
         const cells = [i, i + 1, i + cols, i + cols + 1];
         if (!cells.every((j) => ok(j) && !used[j] && cur[j] === cur[i])) continue;
         for (const j of cells) used[j] = 1;
@@ -106,7 +128,7 @@ export function findSpots(life: Life, pairs: boolean): Spot[] {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
-      if (used[i] || !ok(i) || positionHash(x, y) >= SINGLE_CHANCE) continue;
+      if (used[i] || !ok(i) || positionHash(x, y) >= odds.single) continue;
       spots.push({ key: i, kind: 'single', cells: [i], x: x + 0.5, y: y + 0.5, traits: traitsAt(x, y) });
     }
   }
@@ -447,6 +469,8 @@ export interface CritterFrame {
   /** Colour of the floating z's. */
   ink: string;
   pairs: boolean;
+  /** How readily critters appear, 0–100 (see critterOdds). Defaults to DEFAULT_ABUNDANCE. */
+  abundance?: number;
 }
 
 export class Critters {
@@ -494,7 +518,7 @@ export class Critters {
     const changed = life.gen !== this.lastGen;
     this.lastGen = life.gen;
 
-    this.sync(life, f.pairs, changed);
+    this.sync(life, f.pairs, critterOdds(f.abundance ?? DEFAULT_ABUNDANCE), changed);
     if (changed) this.react(life);
 
     const { cell: c, ox, oy } = place;
@@ -561,8 +585,8 @@ export class Critters {
    * Match the critters to the board. New spots open an eye; a critter whose cell is melting away
    * stays (and closes) until the melt is done; anything else that no longer qualifies goes.
    */
-  private sync(life: Life, pairs: boolean, changed: boolean): void {
-    const spots = findSpots(life, pairs);
+  private sync(life: Life, pairs: boolean, odds: CritterOdds, changed: boolean): void {
+    const spots = findSpots(life, pairs, odds);
     const seen = new Set<number>();
     for (const spot of spots) {
       seen.add(spot.key);

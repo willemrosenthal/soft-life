@@ -1,4 +1,5 @@
 import { BRUSH_MAX, BRUSH_MIN } from './brush';
+import { ABUNDANCE_MAX, ABUNDANCE_MIN, DEFAULT_ABUNDANCE } from './critters';
 import { parseRule } from './life';
 import { isPaletteId, type PaletteId } from './palettes';
 import type { CellStyle, ColourMode } from './render';
@@ -13,6 +14,8 @@ export interface Settings {
   rule: string;
   wrap: boolean;
   critters: boolean;
+  /** How readily critters appear, 0 (only very stable cells, rarely) to 100 (almost anything that lives a few generations). */
+  critterAbundance: number;
   smooth: boolean;
   /** Generations per second: one of SPEED_STEPS. */
   speed: number;
@@ -50,7 +53,7 @@ export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
+  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
 };
 
 const STYLES: readonly CellStyle[] = ['goo', 'dots', 'pixels'];
@@ -72,6 +75,7 @@ export function parseSettings(value: unknown): Settings {
     rule: typeof v.rule === 'string' && parseRule(v.rule) ? v.rule : d.rule,
     wrap: flag(v.wrap, d.wrap),
     critters: flag(v.critters, d.critters),
+    critterAbundance: int(v.critterAbundance, ABUNDANCE_MIN, ABUNDANCE_MAX, d.critterAbundance),
     smooth: flag(v.smooth, d.smooth),
     speed: SPEED_STEPS.includes(v.speed as number) ? (v.speed as number) : d.speed,
     labSpeed: SPEED_STEPS.includes(v.labSpeed as number) ? (v.labSpeed as number) : d.labSpeed,

@@ -6,6 +6,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/jetbrains-mono/500.css';
 import './styles.css';
 import { BRUSH_MAX, BRUSH_MIN, brushCells, brushCentre, strokePoints, type Point } from './brush';
+import { ABUNDANCE_MAX, ABUNDANCE_MIN } from './critters';
 import { Drawer, DrawerStack } from './drawers';
 import { Life, parseRule, type Rule } from './life';
 import { PALETTES, type Palette, type PaletteId } from './palettes';
@@ -375,7 +376,7 @@ el('#btnClear').addEventListener('click', () => {
 el('#btnShare').addEventListener('click', () => void share());
 
 /** A range input bound to a numeric setting, with its readout. */
-function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps', min: number, max: number, onChange: () => void): HTMLInputElement {
+function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps' | 'critterAbundance', min: number, max: number, onChange: () => void): HTMLInputElement {
   const input = el<HTMLInputElement>(`#${id}`);
   input.min = String(min);
   input.max = String(max);
@@ -452,6 +453,19 @@ const redrawBoards = () => {
 bindRange('melt', 'melt', MELT_MIN, MELT_MAX, redrawBoards);
 bindRange('gaps', 'gaps', GAPS_MIN, GAPS_MAX, redrawBoards);
 syncGoo();
+
+const crittersOut = el('#crittersOut');
+/** The abundance slider only shows while critters are on. */
+function syncCritters(): void {
+  el('#crittersRow').hidden = !settings.critters;
+  const a = settings.critterAbundance;
+  crittersOut.textContent = a < 15 ? 'Rare' : a < 40 ? 'Few' : a < 65 ? 'Some' : a < 90 ? 'Many' : 'Swarm';
+}
+bindRange('critterAbundance', 'critterAbundance', ABUNDANCE_MIN, ABUNDANCE_MAX, () => {
+  syncCritters();
+  dirty = true;
+});
+syncCritters();
 
 /** The brush's footprint, drawn in the current colour (or grey for the eraser). */
 function drawBrushPreview(): void {
@@ -648,6 +662,7 @@ setPanel.addEventListener('click', (e) => {
   if (toggle) {
     const key = toggle.dataset.toggle as 'smooth' | 'critters' | 'wrap';
     settings[key] = !settings[key];
+    syncCritters();
   }
   if ((choice && group) || toggle) {
     save();

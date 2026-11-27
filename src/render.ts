@@ -90,6 +90,8 @@ export interface Look {
   style: CellStyle;
   mode: ColourMode;
   critters: boolean;
+  /** How readily critters appear, 0–100. Defaults to the critters' own default. */
+  critterAbundance?: number;
   stickiness: number;
   /** Goo only: how readily different colours join, 0 (never) to 100. */
   melt: number;
@@ -172,7 +174,7 @@ export class BoardRenderer {
 
     if (look.critters) {
       this.critters.draw(ctx, {
-        life, place: view, now, iris: pal.iris, ink: pal.fg, pairs: look.style === 'goo',
+        life, place: view, now, iris: pal.iris, ink: pal.fg, pairs: look.style === 'goo', abundance: look.critterAbundance,
         skinOf: (i) => colours[colour[i]!]!,
         sizeOf: (i) => size[i]!,
       });
