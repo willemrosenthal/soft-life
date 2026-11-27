@@ -26,6 +26,7 @@ describe('parseRule', () => {
   });
   it('rejects anything else', () => {
     expect(parseRule('B9/S23')).toBeNull();
+    expect(parseRule('B03/S23')).toBeNull(); // born with 0 makes the whole board flash
     expect(parseRule('23/3')).toBeNull();
     expect(parseRule('')).toBeNull();
   });

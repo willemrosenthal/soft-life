@@ -15,9 +15,12 @@ export interface Rule {
   readonly survive: ReadonlySet<number>;
 }
 
-/** "B3/S23" → Conway's rule. Null for anything that isn't B<digits>/S<digits> with digits 0–8. */
+/**
+ * "B3/S23" → Conway's rule. Null for anything that isn't B<digits>/S<digits> with digits 0–8.
+ * "Born with 0" is refused too: every empty cell would come alive at once and the board would flash.
+ */
 export function parseRule(text: string): Rule | null {
-  const m = /^B([0-8]*)\/S([0-8]*)$/i.exec(text.trim());
+  const m = /^B([1-8]*)\/S([0-8]*)$/i.exec(text.trim());
   if (!m) return null;
   return { born: new Set([...m[1]!].map(Number)), survive: new Set([...m[2]!].map(Number)) };
 }

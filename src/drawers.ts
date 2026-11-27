@@ -151,7 +151,7 @@ export class DrawerStack {
   private readonly onDown = (e: PointerEvent): void => {
     if (e.button > 0 || this.g) return;
     const t = e.target as Element;
-    if (t.closest('input[type="range"], input[type="search"]')) return;
+    if (t.closest('input[type="range"], input[type="search"], input[type="text"]')) return;
     let drawer: Drawer | undefined;
     let tap: Gesture['tap'] = null;
     const handle = t.closest<HTMLElement>('[data-drag]');
