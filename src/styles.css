@@ -39,13 +39,22 @@ svg { display: block; }
 /* Rail: a pill of tools on the right edge. It stays out while you draw. */
 .rail-wrap {
   position: absolute; top: 0; bottom: 0; right: 0; z-index: 10; display: flex; align-items: center;
-  padding: env(safe-area-inset-top, 0px) calc(10px + env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) 6px;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0;
   pointer-events: none;
 }
+/*
+ * The swipe target: the rail plus a generous invisible margin above, below, to its left and out to
+ * the screen edge, so it's easy to catch. pan-y lets a tall rail scroll on short screens while a
+ * sideways swipe still reaches the drawer instead of being taken by the browser.
+ */
+.rail-grip {
+  pointer-events: auto; cursor: grab; touch-action: pan-y;
+  display: flex; flex-direction: column; max-height: 100%; padding: 56px 10px 56px 32px;
+}
 .rail {
-  pointer-events: auto; display: grid; gap: 4px; justify-items: center; padding: 7px; border-radius: 32px; cursor: grab;
+  display: grid; gap: 4px; justify-items: center; padding: 7px; border-radius: 32px; min-height: 0;
   background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: var(--float-shadow);
-  max-height: 100%; overflow-y: auto; scrollbar-width: none;
+  overflow-y: auto; scrollbar-width: none; touch-action: pan-y;
 }
 .rail hr { width: 22px; height: 1px; border: 0; margin: 3px 0; background: var(--app-line); }
 .rb { width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; background: none; display: grid; place-items: center; cursor: pointer; position: relative; flex: none; }
@@ -99,6 +108,8 @@ svg { display: block; }
 
 /* Panels (patterns, settings): slide in from the right over the board. */
 .panel {
+  /* pan-y: sideways swipes anywhere on a panel go to the drawer (to swipe it shut), not the browser. */
+  touch-action: pan-y;
   position: absolute; z-index: 30; top: 0; bottom: 0; right: 0; width: min(88%, 420px); display: flex; flex-direction: column;
   padding-top: env(safe-area-inset-top, 0px); padding-right: env(safe-area-inset-right, 0px);
   background: color-mix(in srgb, var(--app-bg) 94%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);

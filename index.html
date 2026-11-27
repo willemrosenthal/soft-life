@@ -25,7 +25,9 @@
     <button type="button" class="rail-tab" id="railTab" data-drag="rail" aria-label="Show tools" aria-controls="rail" aria-expanded="true" title="Show tools (H)"></button>
 
     <nav class="rail-wrap" id="rail" aria-label="Tools">
-      <div class="rail" data-drag="rail">
+      <!-- The grip is the rail plus an invisible margin around it (out to the screen edge), all of which swipes it shut. -->
+      <div class="rail-grip" data-drag="rail">
+      <div class="rail">
         <button type="button" class="rail-play" id="btnPlay" aria-label="Pause" title="Play / pause (Space)">
           <svg id="icoPlay" viewBox="0 0 24 24" fill="currentColor"></svg>
         </button>
@@ -56,6 +58,7 @@
         <button type="button" class="rb" id="btnSet" aria-controls="setPanel" aria-label="Settings" title="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
         </button>
+      </div>
       </div>
     </nav>
 
