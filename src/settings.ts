@@ -1,3 +1,4 @@
+import { BRUSH_MAX, BRUSH_MIN } from './brush';
 import { parseRule } from './life';
 import { isPaletteId, type PaletteId } from './palettes';
 import type { CellStyle, ColourMode } from './render';
@@ -13,16 +14,22 @@ export interface Settings {
   smooth: boolean;
   /** Generations per second. */
   speed: number;
-  /** Controls folded away for a bigger board. */
-  dockHidden: boolean;
+  /** Dots across the screen. */
+  density: number;
+  /** How many dots wide a stroke draws. */
+  brushSize: number;
+  /** The tool rail tucked away off the right edge. */
+  railHidden: boolean;
 }
 
 export const SPEED_MIN = 1;
 export const SPEED_MAX = 30;
+export const DENSITY_MIN = 12;
+export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, smooth: true, speed: 8, dockHidden: false,
+  wrap: true, critters: true, smooth: true, speed: 8, density: 26, brushSize: 1, railHidden: false,
 };
 
 const STYLES: readonly CellStyle[] = ['goo', 'dots', 'pixels'];
@@ -36,6 +43,7 @@ export function parseSettings(value: unknown): Settings {
   const v = value as Record<string, unknown>;
   const flag = (x: unknown, fallback: boolean) => (typeof x === 'boolean' ? x : fallback);
   const oneOf = <T extends string>(x: unknown, options: readonly T[], fallback: T) => (options.includes(x as T) ? (x as T) : fallback);
+  const int = (x: unknown, min: number, max: number, fallback: number) => (typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : fallback);
   return {
     palette: isPaletteId(v.palette) ? v.palette : d.palette,
     style: oneOf(v.style, STYLES, d.style),
@@ -44,8 +52,10 @@ export function parseSettings(value: unknown): Settings {
     wrap: flag(v.wrap, d.wrap),
     critters: flag(v.critters, d.critters),
     smooth: flag(v.smooth, d.smooth),
-    speed: typeof v.speed === 'number' && Number.isInteger(v.speed) && v.speed >= SPEED_MIN && v.speed <= SPEED_MAX ? v.speed : d.speed,
-    dockHidden: flag(v.dockHidden, d.dockHidden),
+    speed: int(v.speed, SPEED_MIN, SPEED_MAX, d.speed),
+    density: int(v.density, DENSITY_MIN, DENSITY_MAX, d.density),
+    brushSize: int(v.brushSize, BRUSH_MIN, BRUSH_MAX, d.brushSize),
+    railHidden: flag(v.railHidden, d.railHidden),
   };
 }
 

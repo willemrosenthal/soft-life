@@ -14,58 +14,72 @@
 </head>
 <body>
   <div class="app" id="app">
-    <header class="bar">
-      <span class="brand"><canvas class="logo" id="logo" width="36" height="36" aria-hidden="true"></canvas>Softlife</span>
-      <span class="stats"><span id="gen">Gen 0</span><span id="pop">Pop 0</span></span>
-      <span class="bar-actions">
-        <button type="button" class="ib ib-sm" id="btnLib" aria-label="Pattern library" title="Patterns">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>
-        </button>
-        <button type="button" class="ib ib-sm" id="btnSet" aria-label="Settings" title="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
-        </button>
-      </span>
-    </header>
-
     <main class="board" id="board">
       <canvas id="cv" aria-label="Game board. Tap or drag to draw cells."></canvas>
       <div class="toast" id="toast" role="status" hidden></div>
-      <button type="button" class="expand" id="btnExpand" aria-label="Show controls" aria-controls="dock" aria-expanded="true" title="Show controls (H)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
-      </button>
     </main>
 
-    <div class="dock-wrap">
-      <section class="dock" id="dock" aria-label="Controls">
-        <div class="dock-inner">
-        <button type="button" class="handle" id="btnCollapse" aria-label="Hide controls" aria-controls="dock" aria-expanded="true" title="Hide controls (H)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="swatches" id="swatches"></div>
-        <div class="controls">
-          <button type="button" class="ib" id="btnRand" aria-label="Random soup" title="Random soup">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/></svg>
-          </button>
-          <button type="button" class="ib" id="btnStep" aria-label="Step one generation" title="Step">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5.5v13a1 1 0 0 0 1.5.86l10-6.5a1 1 0 0 0 0-1.72l-10-6.5A1 1 0 0 0 6 5.5Z" opacity=".35"/><rect x="17" y="5" width="2.6" height="14" rx="1.3"/></svg>
-          </button>
-          <button type="button" class="play" id="btnPlay" aria-label="Pause" title="Play / pause (Space)">
-            <svg id="icoPlay" viewBox="0 0 24 24" fill="currentColor"></svg>
-          </button>
-          <button type="button" class="ib" id="btnClear" aria-label="Clear board" title="Clear">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-          </button>
-          <button type="button" class="ib" id="btnShare" aria-label="Share pattern link" title="Share">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
-          </button>
-        </div>
-        <label class="speed" for="speed"><span>Speed</span><input type="range" id="speed" min="1" max="30"><output id="speedOut" for="speed"></output></label>
-        </div>
-      </section>
-    </div>
-  </div>
+    <div class="shade" id="shade"></div>
 
-  <dialog class="sheet" id="libSheet" aria-labelledby="libTitle">
+    <!-- Shown while the rail is tucked away; drag or tap it to bring the rail back. -->
+    <button type="button" class="rail-tab" id="railTab" data-drag="rail" aria-label="Show tools" aria-controls="rail" aria-expanded="true" title="Show tools (H)"></button>
+
+    <nav class="rail-wrap" id="rail" aria-label="Tools">
+      <div class="rail" data-drag="rail">
+        <button type="button" class="rail-play" id="btnPlay" aria-label="Pause" title="Play / pause (Space)">
+          <svg id="icoPlay" viewBox="0 0 24 24" fill="currentColor"></svg>
+        </button>
+        <button type="button" class="rb" id="btnColour" data-pop="colourPop" aria-controls="colourPop" aria-expanded="false" aria-label="Colour" title="Colour">
+          <span class="rail-sw" id="railSw"></span>
+        </button>
+        <button type="button" class="rb" id="btnSize" data-pop="sizePop" aria-controls="sizePop" aria-expanded="false" aria-label="Draw size" title="Draw size">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/></svg>
+          <span class="badge" id="sizeBadge"></span>
+        </button>
+        <button type="button" class="rb" id="btnBoard" data-pop="boardPop" aria-controls="boardPop" aria-expanded="false" aria-label="Density and speed" title="Density and speed">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg>
+        </button>
+        <hr>
+        <button type="button" class="rb" id="btnRand" aria-label="Random soup" title="Random soup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/></svg>
+        </button>
+        <button type="button" class="rb" id="btnClear" aria-label="Clear board" title="Clear">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+        <button type="button" class="rb" id="btnShare" aria-label="Share pattern link" title="Share">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
+        </button>
+        <hr>
+        <button type="button" class="rb" id="btnLib" aria-controls="libPanel" aria-label="Pattern library" title="Patterns">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>
+        </button>
+        <button type="button" class="rb" id="btnSet" aria-controls="setPanel" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Pop-ups beside the rail. -->
+    <div class="pop" id="colourPop" role="dialog" aria-label="Colour" hidden>
+      <h3>Colour</h3>
+      <div class="swatches" id="swatches"></div>
+    </div>
+    <div class="pop" id="sizePop" role="dialog" aria-label="Draw size" hidden>
+      <h3><label for="size">Draw size</label><output id="sizeOut" for="size"></output></h3>
+      <div class="pop-row"><input type="range" id="size" min="1" max="7"><canvas class="brush-preview" id="sizePreview" aria-hidden="true"></canvas></div>
+    </div>
+    <div class="pop" id="boardPop" role="dialog" aria-label="Density and speed" hidden>
+      <h3><label for="density">Density</label><output id="densityOut" for="density"></output></h3>
+      <input type="range" id="density">
+      <h3><label for="speed">Speed</label><output id="speedOut" for="speed"></output></h3>
+      <input type="range" id="speed" min="1" max="30">
+      <div class="pop-foot">
+        <span class="stats"><span id="gen">Gen 0</span><span id="popCount">Pop 0</span></span>
+        <button type="button" class="pill" id="btnStep">Step</button>
+      </div>
+    </div>
+
+  <aside class="panel" id="libPanel" role="dialog" aria-modal="true" aria-labelledby="libTitle">
     <div class="sheet-head">
       <h2 id="libTitle">Patterns</h2>
       <span class="stats" id="libCount"></span>
@@ -84,9 +98,9 @@
       <div class="lib" id="lib"></div>
       <p class="empty" id="libEmpty" hidden>No pattern matches that.</p>
     </div>
-  </dialog>
+  </aside>
 
-  <dialog class="sheet" id="setSheet" aria-labelledby="setTitle">
+  <aside class="panel" id="setPanel" role="dialog" aria-modal="true" aria-labelledby="setTitle">
     <div class="sheet-head">
       <h2 id="setTitle">Settings</h2>
       <button type="button" class="ib ib-sm" data-close aria-label="Close settings">
@@ -112,9 +126,10 @@
           <button type="button" class="row" role="switch" data-toggle="critters"><span>Critters<small>Long-lived cells open an eye and look around</small></span><i class="switch"></i></button>
           <button type="button" class="row" role="switch" data-toggle="wrap"><span>Wrap edges<small>The board is a torus</small></span><i class="switch"></i></button>
         </div></div>
-      <p class="hint">Keyboard: Space plays and pauses, H hides the controls.</p>
+      <p class="hint">Swipe the rail off the right edge to clear the screen; swipe in from the edge to bring it back. Keyboard: Space plays and pauses, H hides or shows the rail.</p>
     </div>
-  </dialog>
+  </aside>
+  </div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

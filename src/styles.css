@@ -5,103 +5,111 @@
   --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Frosted surfaces float over the board. */
+  --glass: color-mix(in srgb, var(--app-panel) 90%, transparent);
+  --float-shadow: inset 0 0 0 1px var(--app-line), 0 12px 32px -14px rgba(0, 0, 0, .45);
 }
 * { box-sizing: border-box; }
+/* `hidden` always wins, even over components that set their own display (pop-ups, toast). */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--app-bg); color: var(--app-fg);
   font: 13px/1.5 var(--body); -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: none; transition: background-color .3s, color .3s;
+  overscroll-behavior: none; transition: background-color .3s, color .3s; overflow: hidden;
 }
 button { font: inherit; color: inherit; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 svg { display: block; }
 
-/* App: one column the height of the screen. The board takes whatever the bar and dock leave. */
-.app {
-  height: 100dvh; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
-}
-.bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 18px; flex: none; }
-.brand { font: 800 19px/1 var(--display); letter-spacing: -.02em; display: flex; align-items: center; gap: 7px; }
-.logo { width: 18px; height: 18px; }
-.stats { font: 500 11px/1.2 var(--mono); color: var(--app-muted); display: flex; gap: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
-.bar-actions { display: flex; gap: 6px; }
-
-.board { flex: 1; min-height: 0; position: relative; margin: 0 8px; border-radius: 22px; overflow: hidden; }
+/* App: the board fills the whole screen, under the system bars too. Everything else floats over it. */
+.app { position: relative; height: 100dvh; overflow: hidden; isolation: isolate; }
+.board { position: absolute; inset: 0; }
 .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
 .toast {
-  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  position: absolute; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); max-width: calc(100% - 24px);
   background: var(--app-fg); color: var(--app-bg); font-weight: 600; font-size: 12px; padding: 6px 12px; border-radius: 99px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; z-index: 50;
 }
 
-/* Dock: folds to nothing (grid row 1fr → 0fr) so the board can grow into the space. */
-.dock-wrap { display: grid; grid-template-rows: 1fr; flex: none; }
-.app.ready .dock-wrap { transition: grid-template-rows .3s var(--ease); }
-.app.dock-hidden .dock-wrap { grid-template-rows: 0fr; }
-.dock { min-height: 0; overflow: hidden; }
-/* Padding lives on the inner box: a box can't fold smaller than its own padding. */
-.dock-inner { display: grid; gap: 12px; padding: 2px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
-.app.ready .dock { transition: opacity .2s ease; }
-.app.dock-hidden .dock { opacity: 0; }
-.handle {
-  justify-self: center; width: 56px; height: 22px; margin-top: 2px; border: 0; border-radius: 99px; padding: 0;
-  background: transparent; color: var(--app-muted); display: grid; place-items: center; cursor: pointer;
-}
-.handle:hover { background: var(--app-panel); color: var(--app-fg); }
-.handle svg { width: 18px; height: 18px; }
+/* Drawers (drawers.ts): placed by transform; .animating while settling. */
+.animating { transition: transform .34s var(--ease), opacity .34s var(--ease); }
+.shade { position: absolute; inset: 0; z-index: 20; background: rgba(8, 12, 10, .34); opacity: 0; pointer-events: none; }
 
-/* Expand button: only while the dock is folded away, in the board's bottom-right corner. */
-.expand {
-  position: absolute; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  width: 40px; height: 40px; border: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; cursor: pointer;
-  background: color-mix(in srgb, var(--app-panel) 82%, transparent); color: var(--app-fg);
-  box-shadow: inset 0 0 0 1px var(--app-line), 0 6px 16px -8px rgba(0, 0, 0, .35);
-  backdrop-filter: blur(6px);
-  opacity: 0; visibility: hidden; transform: translateY(6px) scale(.9);
+/* Rail: a pill of tools on the right edge. It stays out while you draw. */
+.rail-wrap {
+  position: absolute; top: 0; bottom: 0; right: 0; z-index: 10; display: flex; align-items: center;
+  padding: env(safe-area-inset-top, 0px) calc(10px + env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) 6px;
+  pointer-events: none;
 }
-.app.ready .expand { transition: opacity .2s ease, transform .25s var(--ease), visibility 0s linear .25s; }
-.app.dock-hidden .expand { opacity: 1; visibility: visible; transform: none; transition-delay: .12s, .12s, 0s; }
-.expand svg { width: 20px; height: 20px; }
+.rail {
+  pointer-events: auto; display: grid; gap: 4px; justify-items: center; padding: 7px; border-radius: 32px; cursor: grab;
+  background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: var(--float-shadow);
+  max-height: 100%; overflow-y: auto; scrollbar-width: none;
+}
+.rail hr { width: 22px; height: 1px; border: 0; margin: 3px 0; background: var(--app-line); }
+.rb { width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; background: none; display: grid; place-items: center; cursor: pointer; position: relative; flex: none; }
+.rb svg { width: 20px; height: 20px; }
+.rb:hover, .rb[aria-expanded="true"] { background: var(--app-bg); box-shadow: inset 0 0 0 1px var(--app-line); }
+.rail-play { width: 48px; height: 48px; border-radius: 50%; border: 0; padding: 0; background: var(--app-fg); color: var(--app-bg); display: grid; place-items: center; cursor: pointer; }
+.rail-play svg { width: 20px; height: 20px; }
+.rail-sw { width: 26px; height: 26px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--app-panel), 0 0 0 3.5px var(--app-fg); }
+.rail-sw.erase { background: var(--app-panel); box-shadow: inset 0 0 0 1.5px var(--app-muted); }
+.badge {
+  position: absolute; right: 1px; bottom: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;
+  display: grid; place-items: center; font: 600 9.5px/1 var(--mono); background: var(--app-fg); color: var(--app-bg);
+}
+/* The tab that brings the rail back once it's tucked away. */
+.rail-tab {
+  position: absolute; z-index: 9; top: 50%; right: calc(4px + env(safe-area-inset-right, 0px)); width: 5px; height: 48px; margin-top: -24px;
+  border: 0; padding: 0; border-radius: 99px; background: var(--app-fg); opacity: 0; pointer-events: none; cursor: pointer; transition: opacity .25s;
+}
+.rail-tab::after { content: ""; position: absolute; inset: -16px -10px; }
+.app.rail-hidden .rail-tab { opacity: .25; pointer-events: auto; }
+.rail-tab:hover, .rail-tab:focus-visible { opacity: .5 !important; }
 
-.swatches { display: flex; justify-content: space-between; align-items: center; }
+/* Pop-ups beside the rail (placed by main.ts). */
+.pop {
+  position: absolute; z-index: 15; width: 228px; padding: 12px 14px 14px; border-radius: 20px; display: grid; gap: 9px;
+  background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: var(--float-shadow);
+  transform-origin: right center; animation: pop-in .18s var(--ease);
+}
+@keyframes pop-in { from { opacity: 0; transform: translateX(8px) scale(.95); } }
+.pop h3 { margin: 0; display: flex; justify-content: space-between; align-items: baseline; font: 500 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--app-muted); }
+.pop output { font: 500 11px var(--mono); letter-spacing: 0; text-transform: none; color: var(--app-fg); font-variant-numeric: tabular-nums; }
+.pop input[type="range"] { width: 100%; margin: 0; accent-color: var(--app-fg); }
+.pop-row { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 10px; align-items: center; }
+.brush-preview { width: 32px; height: 32px; }
+.pop-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 2px; }
+.pill { border: 0; border-radius: 99px; padding: 6px 12px; font: 600 12px var(--body); background: var(--app-fg); color: var(--app-bg); cursor: pointer; }
+.stats { font: 500 11px/1.2 var(--mono); color: var(--app-muted); display: flex; gap: 10px; font-variant-numeric: tabular-nums; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 9px; }
 .sw {
-  width: 28px; height: 28px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--c);
-  box-shadow: 0 0 0 2px var(--app-bg), 0 0 0 2px transparent; transition: box-shadow .15s, transform .15s;
+  width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--c);
+  box-shadow: 0 0 0 2px var(--app-panel), 0 0 0 2px transparent; transition: box-shadow .15s, transform .15s;
 }
-.sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--app-bg), 0 0 0 5px var(--app-fg); transform: scale(1.04); }
+.sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--app-panel), 0 0 0 5px var(--app-fg); transform: scale(1.04); }
 .sw.erase { background: var(--app-panel); color: var(--app-fg); display: grid; place-items: center; border: 1.5px dashed var(--app-muted); }
-.controls { display: flex; justify-content: space-between; align-items: center; }
 .ib {
-  width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; background: var(--app-panel); color: var(--app-fg);
+  width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; background: var(--app-panel); color: var(--app-fg);
   display: grid; place-items: center; cursor: pointer; box-shadow: inset 0 0 0 1px var(--app-line);
 }
-.ib svg { width: 20px; height: 20px; }
-.ib-sm { width: 36px; height: 36px; }
-.ib-sm svg { width: 18px; height: 18px; }
-.play { width: 64px; height: 64px; border-radius: 50%; border: 0; padding: 0; background: var(--app-fg); color: var(--app-bg); display: grid; place-items: center; cursor: pointer; }
-.play svg { width: 26px; height: 26px; }
-.speed { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 11px; color: var(--app-muted); }
-.speed input { width: 100%; accent-color: var(--app-fg); }
-.speed output { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+.ib svg { width: 18px; height: 18px; }
 
-/* Sheets (library, settings): slide up from the bottom. */
-.sheet {
-  border: 0; padding: 0; margin: auto auto 0; width: min(560px, 100%); max-width: 100%;
-  height: min(88dvh, 760px); max-height: none; border-radius: 24px 24px 0 0;
-  background: var(--app-bg); color: var(--app-fg); flex-direction: column;
+/* Panels (patterns, settings): slide in from the right over the board. */
+.panel {
+  position: absolute; z-index: 30; top: 0; bottom: 0; right: 0; width: min(88%, 420px); display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px); padding-right: env(safe-area-inset-right, 0px);
+  background: color-mix(in srgb, var(--app-bg) 94%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
+  border-radius: 28px 0 0 28px; box-shadow: -12px 0 44px -16px rgba(0, 0, 0, .45);
 }
-.sheet[open] { display: flex; animation: sheet-in .3s var(--ease); }
-.sheet::backdrop { background: rgba(10, 15, 12, .35); }
-@keyframes sheet-in { from { transform: translateY(48px); opacity: 0; } }
-.sheet-head { display: flex; align-items: center; gap: 10px; padding: 16px 14px 12px 18px; flex: none; }
-.sheet-head h2 { margin: 0; font: 800 19px/1 var(--display); letter-spacing: -.02em; }
+.sheet-head { display: flex; align-items: center; gap: 10px; padding: 18px 14px 12px 20px; flex: none; }
+.sheet-head h2 { margin: 0; font: 800 20px/1 var(--display); letter-spacing: -.02em; }
 .sheet-head .stats { margin-left: auto; }
 .sheet-head h2 + .ib { margin-left: auto; }
 .sheet-body {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
   padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; align-content: start;
 }
 
@@ -141,11 +149,6 @@ svg { display: block; }
 .row[aria-checked="true"] .switch { background: var(--app-accent); }
 .row[aria-checked="true"] .switch::after { transform: translateX(14px); }
 
-/* Wider screens: a little more breathing room around the column. */
-@media (min-width: 600px) {
-  .app { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
-  .sheet { margin-bottom: auto; border-radius: 24px; height: min(80dvh, 720px); }
-}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }

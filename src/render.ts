@@ -123,6 +123,8 @@ export class BoardRenderer {
   private colour = new Int8Array(0);
   /** Eyes on long-lived cells. Set its `pointer` and `calm`, and `poke` it on taps. */
   readonly critters = new Critters();
+  /** Where the brush would draw, shown as a dashed ring; null hides it. */
+  brushRing: BrushRing | null = null;
 
   /**
    * `t` runs 0 → 1 between generations: how far cells have grown in or melted away. `now` is the
@@ -178,5 +180,26 @@ export class BoardRenderer {
       // Turned off: forget them, so they open their eyes afresh when turned back on.
       this.critters.reset();
     }
+    if (this.brushRing) drawRing(ctx, this.brushRing, view, pal);
   }
+}
+
+/** A brush's outline: centre in grid units, `size` dots across, filled faintly in its colour (null = eraser). */
+export interface BrushRing { x: number; y: number; size: number; colour: string | null }
+
+function drawRing(ctx: CanvasRenderingContext2D, ring: BrushRing, view: View, pal: Palette): void {
+  const { cell: c, ox, oy } = view;
+  const r = Math.max(0.55, ring.size / 2) * c;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(ox + ring.x * c, oy + ring.y * c, r, 0, TAU);
+  ctx.globalAlpha = 0.1;
+  ctx.fillStyle = ring.colour ?? pal.fg;
+  ctx.fill();
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = pal.fg;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.restore();
 }
