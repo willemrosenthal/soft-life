@@ -68,13 +68,13 @@
       <div class="swatches" id="swatches"></div>
     </div>
     <div class="pop" id="sizePop" role="dialog" aria-label="Draw size" hidden>
-      <h3><label for="size">Draw size</label><output id="sizeOut" for="size"></output></h3>
+      <h3><label for="size">Draw size</label><button type="button" class="info-dot" data-demo="brush" aria-label="Show what draw size does"></button><output id="sizeOut" for="size"></output></h3>
       <div class="pop-row"><input type="range" id="size" min="1" max="7"><canvas class="brush-preview" id="sizePreview" aria-hidden="true"></canvas></div>
     </div>
     <div class="pop" id="boardPop" role="dialog" aria-label="Density and speed" hidden>
-      <h3><label for="density">Density</label><output id="densityOut" for="density"></output></h3>
+      <h3><label for="density">Density</label><button type="button" class="info-dot" data-demo="density" aria-label="Show what density does"></button><output id="densityOut" for="density"></output></h3>
       <input type="range" id="density">
-      <h3><label for="speed">Speed</label><output id="speedOut" for="speed"></output></h3>
+      <h3><label for="speed">Speed</label><button type="button" class="info-dot" data-demo="speed" aria-label="Show what speed does"></button><output id="speedOut" for="speed"></output></h3>
       <input type="range" id="speed" min="1" max="30">
       <div class="pop-foot">
         <span class="stats"><span id="gen">Gen 0</span><span id="popCount">Pop 0</span></span>
@@ -114,9 +114,9 @@
       <div class="group"><h3>Theme</h3><div class="themes" id="themes"></div></div>
       <div class="group"><h3>Cell style</h3>
         <div class="seg" data-key="style"><button type="button" data-v="goo">Goo</button><button type="button" data-v="dots">Dots</button><button type="button" data-v="pixels">Pixels</button></div>
-        <div class="slider" id="stickyRow"><h3><label for="stickiness">Stickiness</label><output id="stickyOut" for="stickiness"></output></h3><input type="range" id="stickiness"></div>
-        <div class="slider" id="meltRow"><h3><label for="melt">Colour melt</label><output id="meltOut" for="melt"></output></h3><input type="range" id="melt"></div>
-        <div class="slider" id="gapsRow"><h3><label for="gaps">Gaps</label><output id="gapsOut" for="gaps"></output></h3><input type="range" id="gaps"></div></div>
+        <div class="slider" id="stickyRow"><h3><label for="stickiness">Stickiness</label><button type="button" class="info-dot" data-demo="stickiness" aria-label="Show what stickiness does"></button><output id="stickyOut" for="stickiness"></output></h3><input type="range" id="stickiness"></div>
+        <div class="slider" id="meltRow"><h3><label for="melt">Colour melt</label><button type="button" class="info-dot" data-demo="melt" aria-label="Show what colour melt does"></button><output id="meltOut" for="melt"></output></h3><input type="range" id="melt"></div>
+        <div class="slider" id="gapsRow"><h3><label for="gaps">Gaps</label><button type="button" class="info-dot" data-demo="gaps" aria-label="Show what gaps does"></button><output id="gapsOut" for="gaps"></output></h3><input type="range" id="gaps"></div></div>
       <div class="group"><h3>Colour</h3>
         <div class="seg" data-key="mode"><button type="button" data-v="colonies">Colonies</button><button type="button" data-v="solo">Solo</button><button type="button" data-v="age">Age</button></div></div>
       <div class="group"><h3>Rule</h3>
@@ -154,9 +154,9 @@
         </button>
         <span class="preview-gen" id="labGen">Gen 0</span>
       </div>
-      <div class="group"><div class="slider"><h3><label for="labSpeed">Preview speed</label><output id="labSpeedOut" for="labSpeed"></output></h3><input type="range" id="labSpeed"></div></div>
-      <div class="group"><h3>Born with<small>An empty spot comes alive</small></h3><div class="counts" id="labBorn"></div></div>
-      <div class="group"><h3>Survives with<small>A living cell stays alive</small></h3><div class="counts" id="labSurvive"></div></div>
+      <div class="group"><div class="slider"><h3><label for="labSpeed">Preview speed</label><button type="button" class="info-dot" data-demo="labSpeed" aria-label="Show what preview speed does"></button><output id="labSpeedOut" for="labSpeed"></output></h3><input type="range" id="labSpeed"></div></div>
+      <div class="group"><h3>Born with<button type="button" class="info-dot" data-demo="rules" data-start="3" aria-label="Watch how born with works"></button><small>An empty spot comes alive</small></h3><div class="counts" id="labBorn"></div></div>
+      <div class="group"><h3>Survives with<button type="button" class="info-dot" data-demo="rules" data-start="4" aria-label="Watch how survives with works"></button><small>A living cell stays alive</small></h3><div class="counts" id="labSurvive"></div></div>
       <p class="rule-line" id="labLine"></p>
       <div class="lab-actions">
         <button type="button" class="ghost" id="labMutate">
@@ -187,6 +187,9 @@
         <h2 id="labInfoTitle">How rules work</h2>
       </div>
       <div class="panel-body info">
+        <button type="button" class="pill pill-wide watch" data-demo="rules" data-start="0">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l10.4-6.8a1 1 0 0 0 0-1.72L9.5 4.34A1 1 0 0 0 8 5.2Z"/></svg>Watch a generation, step by step
+        </button>
         <figure class="hood">
           <svg viewBox="0 0 92 92" aria-hidden="true">
             <rect class="hood-empty" x="2" y="2" width="26" height="26" rx="13"/>
@@ -254,6 +257,20 @@
       </div>
     </section>
   </aside>
+
+  <!-- Demo sheet: the animated scene behind an (i) button (demos.ts). -->
+  <div class="demo-scrim" id="demoScrim" hidden></div>
+  <section class="demo-sheet" id="demoSheet" role="dialog" aria-modal="true" aria-labelledby="demoTitle" hidden>
+    <div class="demo-grabber" aria-hidden="true"></div>
+    <div class="demo-head">
+      <h2 id="demoTitle"></h2>
+      <button type="button" class="ib ib-sm" data-demo-close aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="demoBody"></div>
+    <button type="button" class="pill pill-wide" data-demo-close>Got it</button>
+  </section>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

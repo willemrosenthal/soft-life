@@ -19,6 +19,7 @@ import { DENSITY_MAX, DENSITY_MIN, formatSpeed, loadSettings, saveSettings, SPEE
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
+import { createDemo, type Demo, type DemoHost, type DemoKey } from './demos';
 
 /** Wait this long after the board stops changing size before adding or removing rows. */
 const REGRID_DELAY = 120;
@@ -125,6 +126,7 @@ function frame(now: number): void {
   }
   lastT = t;
   if (labDrawer.amount > 0) runPreview(now);
+  activeDemo?.tick(now);
   requestAnimationFrame(frame);
 }
 
@@ -1011,12 +1013,13 @@ window.addEventListener('hashchange', () => { loadFromLink(); });
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'Escape') {
-    if (pops.some((p) => !p.hidden)) closePops(true);
+    if (activeDemo) closeDemo();
+    else if (pops.some((p) => !p.hidden)) closePops(true);
     else if (!labInfo.hidden) showLabInfo(false);
     else stack.topModal()?.setOpen(false);
     return;
   }
-  if (stack.topModal()) return;
+  if (stack.topModal() || activeDemo) return;
   const target = e.target as Element;
   if (target.closest('input, textarea, select')) return;
   if (e.key === ' ' && !target.closest('button')) {
@@ -1024,6 +1027,81 @@ document.addEventListener('keydown', (e) => {
     setRunning(!running);
   } else if (e.key === 'h' || e.key === 'H') {
     rail.toggle();
+  }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Demos: the (i) beside a slider or rule row opens a sheet with an animated scene (demos.ts).
+
+const demoSheet = el('#demoSheet');
+const demoScrim = el('#demoScrim');
+const demoBody = el('#demoBody');
+const demos = new Map<DemoKey, Demo>();
+let activeDemo: Demo | null = null;
+/** Where focus goes back to when the sheet closes. */
+let demoOpener: HTMLElement | null = null;
+/** While the sheet is open everything else is inert; this remembers what already was. */
+let inertBefore = new Map<HTMLElement, boolean>();
+
+const demoHost: DemoHost = {
+  palette,
+  style: () => settings.style,
+  value: (key) => {
+    if (key === 'speed') return Math.max(0, SPEED_STEPS.indexOf(settings.speed));
+    if (key === 'labSpeed') return Math.max(0, SPEED_STEPS.indexOf(settings.labSpeed));
+    if (key === 'brush') return settings.brushSize;
+    return settings[key];
+  },
+  // From the lab, the rule being made there; anywhere else, the board's.
+  rule: () => (labDrawer.isOpen ? labRule : rule),
+  reducedMotion: () => reducedMotion.matches,
+};
+
+function openDemo(button: HTMLElement): void {
+  const key = button.dataset.demo as DemoKey;
+  // A pop-up closes for the sheet, so focus comes back to the rail button that opened it.
+  const pop = button.closest<HTMLElement>('.pop');
+  demoOpener = pop ? popButtons.find((b) => b.dataset.pop === pop.id) ?? null : button;
+  if (pop) closePops();
+  let demo = demos.get(key);
+  if (!demo) {
+    demo = createDemo(key, demoHost);
+    demos.set(key, demo);
+  }
+  el('#demoTitle').textContent = demo.title;
+  demoBody.replaceChildren(demo.el);
+  inertBefore = new Map();
+  for (const child of app.children) {
+    if (child instanceof HTMLElement && child !== demoSheet && child !== demoScrim) {
+      inertBefore.set(child, child.inert);
+      child.inert = true;
+    }
+  }
+  demoSheet.hidden = false;
+  demoScrim.hidden = false;
+  demoSheet.scrollTop = 0;
+  demo.shown(button.dataset.start ? Number(button.dataset.start) : undefined);
+  activeDemo = demo;
+  el<HTMLElement>('[data-demo-close]', demoSheet).focus({ preventScroll: true });
+}
+
+function closeDemo(): void {
+  if (!activeDemo) return;
+  activeDemo = null;
+  demoSheet.hidden = true;
+  demoScrim.hidden = true;
+  for (const [child, was] of inertBefore) child.inert = was;
+  demoOpener?.focus({ preventScroll: true });
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target as Element;
+  const opener = t.closest<HTMLElement>('[data-demo]');
+  if (opener) {
+    e.preventDefault();
+    openDemo(opener);
+  } else if (t.closest('[data-demo-close]') || t === demoScrim) {
+    closeDemo();
   }
 });
 
