@@ -24,7 +24,7 @@ import {
 } from './rules';
 import { DENSITY_MAX, DENSITY_MIN, formatSpeed, loadSettings, saveSettings, SPEED_STEPS, type Settings } from './settings';
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
-import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
+import { DIAGONALS_MAX, DIAGONALS_MIN, STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
 import { createDemo, type Demo, type DemoHost, type DemoKey } from './demos';
 
@@ -412,7 +412,7 @@ el('#actionsPop').addEventListener('click', (e) => {
 });
 
 /** A range input bound to a numeric setting, with its readout. */
-function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps' | 'critterAbundance', min: number, max: number, onChange: () => void): HTMLInputElement {
+function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'diagonals' | 'melt' | 'gaps' | 'critterAbundance', min: number, max: number, onChange: () => void): HTMLInputElement {
   const input = el<HTMLInputElement>(`#${id}`);
   input.min = String(min);
   input.max = String(max);
@@ -462,21 +462,29 @@ bindRange('density', 'density', DENSITY_MIN, DENSITY_MAX, () => {
 bindRange('size', 'brushSize', BRUSH_MIN, BRUSH_MAX, syncSize);
 
 const stickyOut = el('#stickyOut');
+const diagOut = el('#diagOut');
 const meltOut = el('#meltOut');
 const gapsOut = el('#gapsOut');
-/** Stickiness and colour melt only mean something in the goo style, and gaps only with melt on. */
+/** Stickiness, diagonals and colour melt only mean something in the goo style, and gaps only with melt on. */
 function syncGoo(): void {
   el('#stickyRow').hidden = settings.style !== 'goo';
+  el('#diagRow').hidden = settings.style !== 'goo';
   el('#meltRow').hidden = settings.style !== 'goo';
   el('#gapsRow').hidden = settings.style !== 'goo' || settings.melt === 0;
   const gp = settings.gaps;
   gapsOut.textContent = gp < 15 ? 'Closed' : gp < 40 ? 'Tiny' : gp < 65 ? 'Pinholes' : gp < 90 ? 'Holes' : 'Wide';
   const s = settings.stickiness;
   stickyOut.textContent = s < 25 ? 'Tight' : s < 45 ? 'Soft' : s < 65 ? 'Gooey' : s < 85 ? 'Gloopy' : 'Sticky';
+  const dg = settings.diagonals;
+  diagOut.textContent = dg === 0 ? 'Apart' : dg < 15 ? 'Leaning' : dg < 40 ? 'Threads' : dg < 65 ? 'Strands' : dg < 90 ? 'Bridged' : 'Thick';
   const m = settings.melt;
   meltOut.textContent = m === 0 ? 'Off' : m < 25 ? 'Faint' : m < 50 ? 'Loose' : m < 75 ? 'Even' : m < 95 ? 'Strong' : 'Merged';
 }
 bindRange('stickiness', 'stickiness', STICKINESS_MIN, STICKINESS_MAX, () => {
+  syncGoo();
+  restyle();
+});
+bindRange('diagonals', 'diagonals', DIAGONALS_MIN, DIAGONALS_MAX, () => {
   syncGoo();
   restyle();
 });
@@ -586,7 +594,7 @@ function drawBrushPreview(): void {
   g.clearRect(0, 0, w, w);
   drawCells(g, {
     cols: n, rows: n, cell, ox: offset, oy: offset, size, colour: new Int8Array(n * n),
-    colours: [brush === 'erase' ? palette().muted : palette().cells[brush]!], style: settings.style, stickiness: settings.stickiness,
+    colours: [brush === 'erase' ? palette().muted : palette().cells[brush]!], style: settings.style, stickiness: settings.stickiness, diagonals: settings.diagonals,
   });
 }
 
@@ -670,7 +678,7 @@ function drawThumbnails(): void {
     g.fillRect(0, 0, w, h);
     drawCells(g, {
       cols, rows, cell, ox: (w - cols * cell) / 2, oy: (h - rows * cell) / 2,
-      size, colour: new Int8Array(cols * rows), colours: [palette().cells[patternColony(index) - 1]!], style: settings.style, stickiness: settings.stickiness,
+      size, colour: new Int8Array(cols * rows), colours: [palette().cells[patternColony(index) - 1]!], style: settings.style, stickiness: settings.stickiness, diagonals: settings.diagonals,
     });
   }
 }
@@ -744,7 +752,7 @@ themesBox.addEventListener('click', (e) => {
   applyTheme();
 });
 
-/** Redraw everything that shows cells after the cell style or stickiness changes. */
+/** Redraw everything that shows cells after the cell style, stickiness or diagonals change. */
 function restyle(): void {
   drawThumbnails();
   drawRuleThumbnails();
@@ -1074,7 +1082,7 @@ function drawRuleThumbnails(): void {
     }
     g.fillStyle = palette().bg;
     g.fillRect(0, 0, w, h);
-    drawCells(g, { cols: THUMB_COLS, rows: THUMB_ROWS, cell, ox: (w - THUMB_COLS * cell) / 2, oy: (h - THUMB_ROWS * cell) / 2, size, colour, colours: palette().cells, style: settings.style, stickiness: settings.stickiness, wrap: true });
+    drawCells(g, { cols: THUMB_COLS, rows: THUMB_ROWS, cell, ox: (w - THUMB_COLS * cell) / 2, oy: (h - THUMB_ROWS * cell) / 2, size, colour, colours: palette().cells, style: settings.style, stickiness: settings.stickiness, diagonals: settings.diagonals, wrap: true });
   }
 }
 

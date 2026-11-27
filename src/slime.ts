@@ -74,6 +74,82 @@ export function blockLump(g: Pick<SlimeLayer, 'cols' | 'rows' | 'size' | 'colour
   return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 }
 
+export const DIAGONALS_MIN = 0;
+export const DIAGONALS_MAX = 100;
+
+/** The strand between diagonal neighbours at the two ends of its range (see diagonalStrand). */
+const STRAND_THIN = { reach: 0.32, weight: 2.2 };
+const STRAND_THICK = { reach: 0.45, weight: 3.71 };
+/** At the bottom of the slider the strand is this heavy: just short of joining at stickiness 50. */
+const STRAND_START = 0.8;
+
+/**
+ * The strand joining diagonal neighbours, for a diagonals setting of 0 to 100: how far it reaches
+ * either side of the line between the two cells' centres, and its strength. Over the lower half it
+ * is a slim tube that gets heavier: a thread snaps across around 10, and by 50 the waist is about
+ * 0.26 cells. Over the upper half it also widens, to a waist of about half a cell at 100, close to
+ * a side-by-side join. The waist curves inward all the way, so it never bulges between the cells.
+ * Null at 0: diagonal neighbours stay apart.
+ */
+export function diagonalStrand(diagonals: number): { reach: number; weight: number } | null {
+  const t = Math.max(DIAGONALS_MIN, Math.min(DIAGONALS_MAX, diagonals)) / DIAGONALS_MAX;
+  if (t <= 0) return null;
+  if (t <= 0.5) return { reach: STRAND_THIN.reach, weight: STRAND_START + (STRAND_THIN.weight - STRAND_START) * t / 0.5 };
+  const u = (t - 0.5) / 0.5;
+  return {
+    reach: STRAND_THIN.reach + (STRAND_THICK.reach - STRAND_THIN.reach) * u,
+    weight: STRAND_THIN.weight + (STRAND_THICK.weight - STRAND_THIN.weight) * u,
+  };
+}
+
+/**
+ * A strand's contribution to the field at (px, py), relative to the first cell's centre, for a strand
+ * running to the cell at (dir, 1). It is the same lump as a cell's, smeared evenly along the line
+ * between the two centres: the integral of (1 - d²/r²)³ along the segment, which has a closed form.
+ * `weight` is the whole strand's strength; the GPU version in melt.ts must match.
+ */
+export function strandLevel(px: number, py: number, dir: 1 | -1, reach: number, weight: number): number {
+  // Along the strand (s, from 0 to its length) and across it (h).
+  const s = (px * dir + py) * Math.SQRT1_2;
+  const h2 = px * px + py * py - s * s;
+  const r2 = reach * reach;
+  if (h2 >= r2) return 0;
+  const a2 = r2 - h2;
+  const a = Math.sqrt(a2);
+  const t0 = Math.max(0, s - a) - s;
+  const t1 = Math.min(Math.SQRT2, s + a) - s;
+  if (t1 <= t0) return 0;
+  // ∫ (a² - t²)³ dt
+  const G = (t: number) => { const t2 = t * t; return t * (a2 * a2 * a2 - a2 * a2 * t2 + 0.6 * a2 * t2 * t2 - t2 * t2 * t2 / 7); };
+  return weight * Math.SQRT1_2 * (G(t1) - G(t0)) / (r2 * r2 * r2);
+}
+
+const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/**
+ * Strength (0 to 1) of the strand from (x, y) to its diagonal neighbour (x + dir, y + 1), which must
+ * share its colour. Only for cells that touch at a corner alone: as either of the two cells beside
+ * both of them grows in, the pair joins through it and the strand fades out. Like blockLump it fades
+ * in only once both ends are mostly grown, so it snaps across as a newborn appears.
+ */
+export function diagonalLump(g: Pick<SlimeLayer, 'cols' | 'rows' | 'size' | 'colour' | 'wrap'>, x: number, y: number, dir: 1 | -1): number {
+  const { cols, rows, size, colour, wrap } = g;
+  let xd = x + dir;
+  let y1 = y + 1;
+  if (xd < 0 || xd >= cols || y1 >= rows) {
+    if (!wrap) return 0;
+    xd = (xd + cols) % cols;
+    y1 %= rows;
+  }
+  const i = y * cols + x;
+  const d = y1 * cols + xd;
+  if (colour[d] !== colour[i]) return 0;
+  const grown = smooth((Math.min(size[i]!, size[d]!, 1) - 0.6) / 0.4);
+  if (grown <= 0) return 0;
+  const between = Math.max(size[y * cols + xd]!, size[y1 * cols + x]!);
+  return grown * (1 - smooth(between));
+}
+
 /** Blank rows of samples around the board, in cells. Wide enough for the biggest lump of a wrapped copy. */
 const PAD = 2;
 /** Lumps smaller than this are skipped. */
@@ -115,7 +191,7 @@ const scratch = new Scratch();
  * loops come out in either direction, and holes (inside a ring of cells) are separate loops.
  * `colours` is how many fields there are.
  */
-export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, sinkFor: (colour: number) => PathSink): void {
+export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, sinkFor: (colour: number) => PathSink, diagonals = 0): void {
   const { cols, rows, cell, ox, oy, size, colour, wrap } = g;
   const sub = samplesPerCell(cell);
   const W = (cols + 2 * PAD) * sub + 1;
@@ -128,6 +204,7 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
   // Clamped: past the range, lumps would outgrow PAD and outlines would no longer close.
   const reach = reachFor(Math.max(STICKINESS_MIN, Math.min(STICKINESS_MAX, stickiness)));
   const T = thresholdFor(reach);
+  const strand = diagonalStrand(diagonals);
 
   /** Add a lump centred at (x, y) cells, reaching r cells, at strength w, on the sample grid. */
   const splatOne = (x: number, y: number, r: number, w: number) => {
@@ -139,15 +216,7 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
     const y0 = Math.max(0, Math.ceil(cy - rs));
     const y1 = Math.min(H - 1, Math.floor(cy + rs));
     if (x0 > x1 || y0 > y1) return;
-    // A sample is used by the squares on both sides of it, so mark one square further left and up.
-    const bx1 = Math.min(BW - 1, Math.floor(x1 / sub));
-    const by1 = Math.min(BH - 1, Math.floor(y1 / sub));
-    for (let by = Math.max(0, Math.floor((y0 - 1) / sub)); by <= by1; by++) {
-      for (let bx = Math.max(0, Math.floor((x0 - 1) / sub)); bx <= bx1; bx++) {
-        const b = by * BW + bx;
-        if (!marked[b]) { marked[b] = 1; blocks.push(b); }
-      }
-    }
+    mark(x0, x1, y0, y1);
     const inv = 1 / (rs * rs);
     for (let sy = y0; sy <= y1; sy++) {
       const dy = sy - cy;
@@ -159,20 +228,51 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
       }
     }
   };
-  /** As splatOne, plus the copies across the edges when the board wraps. */
-  const splat = (x: number, y: number, r: number, w = 1) => {
-    splatOne(x, y, r, w);
+  /** Mark the blocks a shape covering samples x0..x1, y0..y1 touches, so marching squares visits them. */
+  const mark = (x0: number, x1: number, y0: number, y1: number) => {
+    // A sample is used by the squares on both sides of it, so mark one square further left and up.
+    const bx1 = Math.min(BW - 1, Math.floor(x1 / sub));
+    const by1 = Math.min(BH - 1, Math.floor(y1 / sub));
+    for (let by = Math.max(0, Math.floor((y0 - 1) / sub)); by <= by1; by++) {
+      for (let bx = Math.max(0, Math.floor((x0 - 1) / sub)); bx <= bx1; bx++) {
+        const b = by * BW + bx;
+        if (!marked[b]) { marked[b] = 1; blocks.push(b); }
+      }
+    }
+  };
+  /** Add the strand from the cell centred at (x, y) to the one at (x + dir, y + 1). */
+  const strandOne = (x: number, y: number, dir: 1 | -1, r: number, w: number) => {
+    const ex = x + Math.min(0, dir) - r;
+    const x0 = Math.max(0, Math.ceil((ex + PAD) * sub));
+    const x1 = Math.min(W - 1, Math.floor((ex + 1 + 2 * r + PAD) * sub));
+    const y0 = Math.max(0, Math.ceil((y - r + PAD) * sub));
+    const y1 = Math.min(H - 1, Math.floor((y + 1 + r + PAD) * sub));
+    if (x0 > x1 || y0 > y1) return;
+    mark(x0, x1, y0, y1);
+    for (let sy = y0; sy <= y1; sy++) {
+      const py = sy / sub - PAD - y;
+      const row = sy * W;
+      for (let sx = x0; sx <= x1; sx++) F[row + sx]! += strandLevel(sx / sub - PAD - x, py, dir, r, w);
+    }
+  };
+  /** Call `at` for (x, y) and, when the board wraps, each copy across an edge within `near` cells of it. */
+  const copies = (x: number, y: number, near: number, at: (x: number, y: number) => void) => {
+    at(x, y);
     if (!wrap) return;
-    // On a tiny board a lump can be near both edges at once, so check each side separately.
-    const near = r + 0.5;
+    // On a tiny board a shape can be near both edges at once, so check each side separately.
     const xs = [x];
     const ys = [y];
     if (x < near) xs.push(x + cols);
     if (x > cols - near) xs.push(x - cols);
     if (y < near) ys.push(y + rows);
     if (y > rows - near) ys.push(y - rows);
-    for (const wy of ys) for (const wx of xs) if (wx !== x || wy !== y) splatOne(wx, wy, r, w);
+    for (const wy of ys) for (const wx of xs) if (wx !== x || wy !== y) at(wx, wy);
   };
+  /** As splatOne, plus the copies across the edges when the board wraps. */
+  const splat = (x: number, y: number, r: number, w = 1) => copies(x, y, r + 0.5, (cx, cy) => splatOne(cx, cy, r, w));
+  /** As strandOne, plus the copies across the edges when the board wraps. */
+  const splatStrand = (x: number, y: number, dir: 1 | -1, r: number, w: number) =>
+    copies(x, y, r + 1.5, (cx, cy) => strandOne(cx, cy, dir, r, w));
 
   /** A block's samples: columns i0..i1 and rows j0..j1, inclusive. */
   const range = (b: number) => {
@@ -190,6 +290,12 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
         splat(x + 0.5, y + 0.5, reach * s);
         const lump = blockLump(g, x, y);
         if (lump > 0) splat(x + 1, y + 1, BLOCK_LUMP_REACH, lump);
+        if (strand) {
+          for (const dir of [1, -1] as const) {
+            const k = diagonalLump(g, x, y, dir);
+            if (k > 0) splatStrand(x + 0.5, y + 0.5, dir, strand.reach, strand.weight * k);
+          }
+        }
       }
     }
     if (!blocks.length) continue;

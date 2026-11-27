@@ -30,6 +30,8 @@ export interface CellLayer {
   style: CellStyle;
   /** Goo only: 0 (tight) to 100 (gloopy). Default 50. */
   stickiness?: number;
+  /** Goo only: how strongly diagonal neighbours join, 0 (apart) to 100. Default 0. */
+  diagonals?: number;
   /** Goo only: blobs reach across the edges. */
   wrap?: boolean;
 }
@@ -44,7 +46,7 @@ function cellPaths(g: CellLayer): Path2D[] {
   const { cols, rows, cell: c, ox, oy, size, colour, colours, style } = g;
   const paths = colours.map(() => new Path2D());
   if (style === 'goo') {
-    traceSlime({ cols, rows, cell: c, ox, oy, size, colour, wrap: g.wrap ?? false }, colours.length, g.stickiness ?? 50, (k) => paths[k]!);
+    traceSlime({ cols, rows, cell: c, ox, oy, size, colour, wrap: g.wrap ?? false }, colours.length, g.stickiness ?? 50, (k) => paths[k]!, g.diagonals ?? 0);
     return paths;
   }
   const R = RADIUS * c;
@@ -93,6 +95,8 @@ export interface Look {
   /** How readily critters appear, 0–100. Defaults to the critters' own default. */
   critterAbundance?: number;
   stickiness: number;
+  /** Goo only: how strongly diagonal neighbours of one colour join, 0 (apart) to 100. */
+  diagonals: number;
   /** Goo only: how readily different colours join, 0 (never) to 100. */
   melt: number;
   /** Goo with melt: the holes where mixed colours meet, 0 (closed) to 100 (wide). */
@@ -169,7 +173,7 @@ export class BoardRenderer {
     ctx.fill(dots);
 
     const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
-    const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, wrap: look.wrap };
+    const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, diagonals: look.diagonals, wrap: look.wrap };
     if (!this.drawMelt(ctx, layer, look, width, height)) this.drawFlat(ctx, layer);
 
     if (look.critters) {
@@ -191,7 +195,7 @@ export class BoardRenderer {
     if (g.style !== 'goo' || look.melt <= 0 || g.colours.length < 2) return false;
     if (this.meltRenderer === undefined) this.meltRenderer = MeltRenderer.create();
     if (!this.meltRenderer) return false;
-    return this.meltRenderer.draw(ctx, { ...g, wrap: look.wrap, stickiness: look.stickiness, melt: look.melt, gaps: look.gaps }, width, height);
+    return this.meltRenderer.draw(ctx, { ...g, wrap: look.wrap, stickiness: look.stickiness, diagonals: look.diagonals, melt: look.melt, gaps: look.gaps }, width, height);
   }
 
   /**
@@ -200,7 +204,7 @@ export class BoardRenderer {
    */
   private drawFlat(ctx: CanvasRenderingContext2D, g: CellLayer): void {
     const n = g.size.length;
-    const key = `${g.style} ${g.stickiness} ${g.wrap} ${g.colours.length} ${g.cell} ${g.ox} ${g.oy}`;
+    const key = `${g.style} ${g.stickiness} ${g.diagonals} ${g.wrap} ${g.colours.length} ${g.cell} ${g.ox} ${g.oy}`;
     if (!this.paths || key !== this.pathsKey || !sameCells(g.size, this.lastSize) || !sameCells(g.colour, this.lastColour)) {
       this.paths = cellPaths(g);
       this.pathsKey = key;

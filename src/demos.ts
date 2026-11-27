@@ -16,7 +16,7 @@ import { formatSpeed, SPEED_STEPS } from './settings';
  * Demos draw only when `tick` is called, which main.ts does while the demo's sheet is open.
  */
 
-export type DemoKey = 'stickiness' | 'melt' | 'gaps' | 'density' | 'speed' | 'labSpeed' | 'brush' | 'rules';
+export type DemoKey = 'stickiness' | 'diagonals' | 'melt' | 'gaps' | 'density' | 'speed' | 'labSpeed' | 'brush' | 'rules';
 
 /** What a demo needs from the app. Read fresh each time, so demos follow theme and setting changes. */
 export interface DemoHost {
@@ -38,7 +38,7 @@ export interface Demo {
 }
 
 export const DEMO_TITLES: Record<DemoKey, string> = {
-  stickiness: 'Stickiness', melt: 'Colour melt', gaps: 'Gaps', density: 'Density', speed: 'Speed',
+  stickiness: 'Stickiness', diagonals: 'Diagonals', melt: 'Colour melt', gaps: 'Gaps', density: 'Density', speed: 'Speed',
   labSpeed: 'Preview speed', brush: 'Draw size', rules: 'How a generation works',
 };
 
@@ -84,7 +84,7 @@ function scene(cols: number, rows: number, cells: readonly (readonly [number, nu
 }
 
 function look(host: DemoHost, over: Partial<Look> = {}): Look {
-  return { style: host.style(), mode: 'colonies', critters: false, stickiness: 50, melt: 0, gaps: 50, wrap: false, ...over };
+  return { style: host.style(), mode: 'colonies', critters: false, stickiness: 50, diagonals: 0, melt: 0, gaps: 50, wrap: false, ...over };
 }
 
 function label(ctx: CanvasRenderingContext2D, pal: Palette, text: string, x: number, y: number): void {
@@ -177,7 +177,7 @@ const SLIDERS: Record<Exclude<DemoKey, 'rules'>, () => SliderSpec> = {
       badge: (v) => `Stickiness ${Math.round(v)}`,
       caption: (v) => v < 30 ? '<b>Tight.</b> Side-by-side cells join with a thin neck, like beads on a string.'
         : v < 70 ? '<b>Soft.</b> Necks fill out, so neighbours read as one blob.'
-          : '<b>Gloopy.</b> Thick necks, and diagonal cells lean toward each other. They never quite join, so patterns stay readable.',
+          : '<b>Gloopy.</b> Thick necks, and diagonal cells lean toward each other. Diagonals decides whether they join.',
       draw: ({ ctx, w, h }, v, now, host) => {
         const view = fitView(w, h, 12, 4, 0.5);
         const pal = host.palette();
@@ -186,6 +186,26 @@ const SLIDERS: Record<Exclude<DemoKey, 'rules'>, () => SliderSpec> = {
         label(ctx, pal, 'side by side', view.ox + 2 * view.cell, y);
         label(ctx, pal, 'diagonal', view.ox + 6 * view.cell, y);
         label(ctx, pal, 'block', view.ox + 10 * view.cell, y);
+      },
+    };
+  },
+  diagonals: () => {
+    // A diagonal pair, a tub (four cells touching only at corners) and a glider.
+    const life = scene(13, 5, [[1, 1, 1], [2, 2, 1], [6, 1, 1], [5, 2, 1], [7, 2, 1], [6, 3, 1], [10, 1, 1], [11, 2, 1], [9, 3, 1], [10, 3, 1], [11, 3, 1]]);
+    return {
+      key: 'diagonals', min: 0, max: 100, ends: ['Apart', 'Thick'], period: 9000,
+      badge: (v) => `Diagonals ${Math.round(v)}`,
+      caption: (v) => v < 8 ? '<b>Apart.</b> Cells that touch only at a corner stay separate, the way Life is usually drawn.'
+        : v < 50 ? '<b>Threads.</b> A slim strand curves in between corner neighbours, so a tub reads as a ring.'
+          : '<b>Bridged.</b> The strand fills out to nearly a side-by-side join, so diagonal shapes read as one creature.',
+      draw: ({ ctx, w, h }, v, now, host) => {
+        const view = fitView(w, h, 13, 5, 0.5);
+        const pal = host.palette();
+        renderer.draw(ctx, life, view, pal, look(host, { style: 'goo', diagonals: v, stickiness: host.value('stickiness') }), 1, now);
+        const y = view.oy + 4.1 * view.cell;
+        label(ctx, pal, 'pair', view.ox + 2 * view.cell, y);
+        label(ctx, pal, 'tub', view.ox + 6.5 * view.cell, y);
+        label(ctx, pal, 'glider', view.ox + 10.5 * view.cell, y);
       },
     };
   },

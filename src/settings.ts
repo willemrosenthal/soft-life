@@ -4,7 +4,7 @@ import { parseRule } from './life';
 import type { CellStyle, ColourMode } from './render';
 import { isThemeKey } from './themes';
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
-import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
+import { DIAGONALS_MAX, DIAGONALS_MIN, STICKINESS_MAX, STICKINESS_MIN } from './slime';
 
 /** Everything remembered between visits. The board itself isn't saved; share a link for that. */
 export interface Settings {
@@ -26,6 +26,8 @@ export interface Settings {
   density: number;
   /** Goo style: how readily neighbours melt together, 0 (tight) to 100 (gloopy). */
   stickiness: number;
+  /** Goo style: how strongly diagonal neighbours of one colour join, 0 (apart, as Life is usually drawn) to 100. */
+  diagonals: number;
   /** Goo style: how readily different colours join, 0 (never) to 100. */
   melt: number;
   /** Goo style, with melt: the holes where mixed colours meet, 0 (closed) to 100 (wide). */
@@ -60,7 +62,7 @@ export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
+  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 0, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
   stylePreview: 'shapes', stylePreviewShown: false,
 };
 
@@ -90,6 +92,7 @@ export function parseSettings(value: unknown): Settings {
     labSpeed: SPEED_STEPS.includes(v.labSpeed as number) ? (v.labSpeed as number) : d.labSpeed,
     density: int(v.density, DENSITY_MIN, DENSITY_MAX, d.density),
     stickiness: int(v.stickiness, STICKINESS_MIN, STICKINESS_MAX, d.stickiness),
+    diagonals: int(v.diagonals, DIAGONALS_MIN, DIAGONALS_MAX, d.diagonals),
     melt: int(v.melt, MELT_MIN, MELT_MAX, d.melt),
     gaps: int(v.gaps, GAPS_MIN, GAPS_MAX, d.gaps),
     brushSize: int(v.brushSize, BRUSH_MIN, BRUSH_MAX, d.brushSize),

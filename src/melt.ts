@@ -13,7 +13,7 @@
  */
 
 import { hexToOklab } from './oklab';
-import { BLOCK_LUMP_REACH, blockLump, reachFor, thresholdFor, type SlimeLayer } from './slime';
+import { BLOCK_LUMP_REACH, blockLump, diagonalLump, diagonalStrand, reachFor, thresholdFor, type SlimeLayer } from './slime';
 
 export const MELT_MIN = 0;
 export const MELT_MAX = 100;
@@ -47,6 +47,9 @@ const FRAGMENT = `#version 300 es
 precision highp float;
 precision highp int;
 uniform highp sampler2D uCells; // per cell: size, colour index, block lump, mixed-colour block lump
+uniform highp sampler2D uDiag;  // per cell: strand to the cell down-right, and down-left (0 = none)
+uniform float uStrandReach;
+uniform float uStrandWeight;
 uniform ivec2 uGrid;
 uniform vec2 uOrigin;           // grid's top-left, in GPU pixels
 uniform float uCell;            // GPU pixels per cell
@@ -76,13 +79,35 @@ vec3 oklabToSrgb(vec3 c) {
     toSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s));
 }
 
+// ∫ (a² - t²)³ dt. Plain products: pow() is undefined for negative t.
+float strandG(float t, float a2) {
+  float t2 = t * t;
+  return t * (a2 * a2 * a2 - a2 * a2 * t2 + 0.6 * a2 * t2 * t2 - t2 * t2 * t2 / 7.0);
+}
+
+// A strand from a cell's centre to its diagonal neighbour at (dir, 1); p is relative to the centre.
+// Must match strandLevel in slime.ts.
+float strand(vec2 p, float dir) {
+  float s = (p.x * dir + p.y) * 0.70710678;
+  float r2 = uStrandReach * uStrandReach;
+  float h2 = dot(p, p) - s * s;
+  if (h2 >= r2) return 0.0;
+  float a2 = r2 - h2;
+  float a = sqrt(a2);
+  float t0 = max(0.0, s - a) - s;
+  float t1 = min(1.41421356, s + a) - s;
+  if (t1 <= t0) return 0.0;
+  return uStrandWeight * 0.70710678 * (strandG(t1, a2) - strandG(t0, a2)) / (r2 * r2 * r2);
+}
+
 void main() {
   vec2 g = (vec2(gl_FragCoord.x, uHeight - gl_FragCoord.y) - uOrigin) / uCell;
   ivec2 base = ivec2(floor(g));
   float F[${MAX_COLOURS}];
   for (int k = 0; k < ${MAX_COLOURS}; k++) F[k] = 0.0;
   float mixed = 0.0; // lumps in the middle of mixed-colour blocks (negative opens a gap): shape only
-  // A lump reaches at most 1.35 cells, so cells two away in each direction are enough.
+  // A lump reaches at most 1.35 cells, and a strand 1.95 from its cell's centre, so cells two away
+  // in each direction are enough.
   for (int dy = -2; dy <= 2; dy++) {
     for (int dx = -2; dx <= 2; dx++) {
       ivec2 c = base + ivec2(dx, dy);
@@ -101,6 +126,9 @@ void main() {
         add += cell.b * ql * ql * ql;
         mixed += cell.a * ql * ql * ql;
       }
+      vec2 diag = texelFetch(uDiag, t, 0).rg;
+      if (diag.x > 0.0) add += diag.x * strand(d, 1.0);
+      if (diag.y > 0.0) add += diag.y * strand(d, -1.0);
       F[int(cell.g + 0.5)] += add;
     }
   }
@@ -134,6 +162,8 @@ export interface MeltLayer extends SlimeLayer {
   stickiness: number;
   /** 0 to 100, as in settings. */
   melt: number;
+  /** 0 to 100, as in settings: how strongly diagonal neighbours of one colour join. */
+  diagonals: number;
   /**
    * 0 to 100, as in settings: the holes where four cells of mixed colours meet. 0 fills them,
    * 50 leaves the field as it is (small pinholes), 100 pushes them open wider.
@@ -145,8 +175,10 @@ export class MeltRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly texture: WebGLTexture;
+  private readonly diagTexture: WebGLTexture;
   private readonly u: Record<string, WebGLUniformLocation | null>;
   private cells = new Float32Array(0);
+  private diag = new Float32Array(0);
   private texCols = 0;
   private texRows = 0;
   private labKey = '';
@@ -175,15 +207,21 @@ export class MeltRenderer {
     const aPos = gl.getAttribLocation(this.program, 'aPos');
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-    this.texture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    const names = ['uCells', 'uGrid', 'uOrigin', 'uCell', 'uHeight', 'uReach', 'uThreshold', 'uMelt', 'uLumpReach', 'uWrap', 'uCount', 'uLab'];
+    const texture = () => {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return tex;
+    };
+    this.texture = texture();
+    this.diagTexture = texture();
+    const names = ['uCells', 'uDiag', 'uStrandReach', 'uStrandWeight', 'uGrid', 'uOrigin', 'uCell', 'uHeight', 'uReach', 'uThreshold', 'uMelt', 'uLumpReach', 'uWrap', 'uCount', 'uLab'];
     this.u = Object.fromEntries(names.map((n) => [n, gl.getUniformLocation(this.program, n)]));
     gl.uniform1i(this.u.uCells!, 0);
+    gl.uniform1i(this.u.uDiag!, 1);
     canvas.addEventListener('webglcontextlost', () => { this.lost = true; });
   }
 
@@ -213,6 +251,9 @@ export class MeltRenderer {
     if (this.cells.length !== n * 4) this.cells = new Float32Array(n * 4);
     const data = this.cells;
     const mixedLump = mixedLumpFor(g.gaps);
+    if (this.diag.length !== n * 2) this.diag = new Float32Array(n * 2);
+    const diag = this.diag;
+    const strand = diagonalStrand(g.diagonals);
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const i = y * cols + x;
@@ -222,17 +263,21 @@ export class MeltRenderer {
         const same = s > 0 ? blockLump(g, x, y) : 0;
         data[i * 4 + 2] = same;
         data[i * 4 + 3] = s > 0 && !same && mixedLump !== 0 ? mixedLump * blockLump(g, x, y, false) : 0;
+        diag[i * 2] = strand && s > 0 ? diagonalLump(g, x, y, 1) : 0;
+        diag[i * 2 + 1] = strand && s > 0 ? diagonalLump(g, x, y, -1) : 0;
       }
     }
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
-    if (cols !== this.texCols || rows !== this.texRows) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, cols, rows, 0, gl.RGBA, gl.FLOAT, data);
-      this.texCols = cols;
-      this.texRows = rows;
-    } else {
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RGBA, gl.FLOAT, data);
-    }
+    const resized = cols !== this.texCols || rows !== this.texRows;
+    if (resized) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, cols, rows, 0, gl.RGBA, gl.FLOAT, data);
+    else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RGBA, gl.FLOAT, data);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.diagTexture);
+    if (resized) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, cols, rows, 0, gl.RG, gl.FLOAT, diag);
+    else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RG, gl.FLOAT, diag);
+    this.texCols = cols;
+    this.texRows = rows;
 
     const key = g.colours.join();
     if (key !== this.labKey) {
@@ -251,6 +296,8 @@ export class MeltRenderer {
     gl.uniform1f(u.uThreshold!, thresholdFor(reach));
     gl.uniform1f(u.uMelt!, g.melt / MELT_MAX);
     gl.uniform1f(u.uLumpReach!, BLOCK_LUMP_REACH);
+    gl.uniform1f(u.uStrandReach!, strand?.reach ?? 1);
+    gl.uniform1f(u.uStrandWeight!, strand?.weight ?? 0);
     gl.uniform1i(u.uWrap!, g.wrap ? 1 : 0);
     gl.uniform1i(u.uCount!, g.colours.length);
     gl.drawArrays(gl.TRIANGLES, 0, 3);

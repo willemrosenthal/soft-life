@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RADIUS, blockLump, traceSlime, type PathSink } from '../src/slime';
+import { RADIUS, blockLump, diagonalLump, diagonalStrand, strandLevel, traceSlime, type PathSink } from '../src/slime';
 
 const CELL = 24;
 
@@ -12,7 +12,7 @@ class Recorder implements PathSink {
 }
 
 /** Trace a board given as rows of characters: '.' empty, digits are colours at full size. */
-function trace(rows: string[], opts: { stickiness?: number; wrap?: boolean; sizes?: Record<number, number>; colours?: number } = {}) {
+function trace(rows: string[], opts: { stickiness?: number; diagonals?: number; wrap?: boolean; sizes?: Record<number, number>; colours?: number } = {}) {
   const cols = rows[0]!.length;
   const size = new Float32Array(cols * rows.length);
   const colour = new Int8Array(cols * rows.length);
@@ -24,7 +24,7 @@ function trace(rows: string[], opts: { stickiness?: number; wrap?: boolean; size
   for (const [i, s] of Object.entries(opts.sizes ?? {})) size[Number(i)] = s;
   const n = opts.colours ?? 1;
   const sinks = Array.from({ length: n }, () => new Recorder());
-  traceSlime({ cols, rows: rows.length, cell: CELL, ox: 0, oy: 0, size, colour, wrap: opts.wrap ?? false }, n, opts.stickiness ?? 50, (k) => sinks[k]!);
+  traceSlime({ cols, rows: rows.length, cell: CELL, ox: 0, oy: 0, size, colour, wrap: opts.wrap ?? false }, n, opts.stickiness ?? 50, (k) => sinks[k]!, opts.diagonals ?? 0);
   return sinks;
 }
 
@@ -118,5 +118,119 @@ describe('blockLump', () => {
     expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 1]), 0, 0, false)).toBe(1);
     expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 0]), 1, 1)).toBe(0);
     expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 0], true), 1, 1)).toBe(1);
+  });
+});
+
+describe('diagonals', () => {
+  const pair = ['....', '.0..', '..0.', '....'];
+  const tub = ['.....', '..0..', '.0.0.', '..0..', '.....'];
+  /** Width of the outline across the middle of the pair, in cells, along the line x + y = const. */
+  const waist = (diagonals: number, stickiness = 50) => {
+    const pts = trace(pair, { diagonals, stickiness })[0]!.loops.flat().map(([x, y]) => [x / CELL - 2, y / CELL - 2]);
+    // Points near the perpendicular through the middle (2, 2): their spread along (1, -1).
+    const across = pts.filter(([x, y]) => Math.abs(x! + y!) < 0.08).map(([x, y]) => (x! - y!) * Math.SQRT1_2);
+    return across.length ? Math.max(...across) - Math.min(...across) : 0;
+  };
+
+  it('keeps diagonal neighbours apart at 0, and only leans them together at the very bottom', () => {
+    expect(trace(pair, { diagonals: 0 })[0]!.loops).toHaveLength(2);
+    expect(trace(pair, { diagonals: 3 })[0]!.loops).toHaveLength(2);
+  });
+
+  it('joins diagonal neighbours from low on the slider up, at any stickiness', () => {
+    for (const stickiness of [0, 50, 100]) {
+      for (const diagonals of [20, 50, 100]) expect(trace(pair, { diagonals, stickiness })[0]!.loops, `${stickiness} ${diagonals}`).toHaveLength(1);
+    }
+  });
+
+  it('turns a tub into a ring', () => {
+    expect(trace(tub)[0]!.loops).toHaveLength(4);
+    expect(trace(tub, { diagonals: 50 })[0]!.loops).toHaveLength(2);
+  });
+
+  it('thickens the strand steadily, from a thread to about half a cell', () => {
+    const w = [20, 50, 75, 100].map((d) => waist(d));
+    for (let k = 1; k < w.length; k++) expect(w[k]!).toBeGreaterThan(w[k - 1]!);
+    expect(w[0]!).toBeLessThan(0.22);
+    expect(w[1]!).toBeGreaterThan(0.18);
+    expect(w[1]!).toBeLessThan(0.34);
+    expect(w[3]!).toBeGreaterThan(0.42);
+    expect(w[3]!).toBeLessThan(0.58);
+  });
+
+  it('never joins different colours', () => {
+    const [a, b] = trace(['....', '.0..', '..1.', '....'], { colours: 2, diagonals: 100 });
+    expect(a!.loops).toHaveLength(1);
+    expect(b!.loops).toHaveLength(1);
+  });
+
+  it('joins across the edges when wrapping', () => {
+    const board = ['0...', '...0', '....'];
+    expect(trace(board, { diagonals: 60 })[0]!.loops).toHaveLength(2);
+    expect(trace(board, { diagonals: 60, wrap: true })[0]!.loops.length).toBeLessThan(trace(board, { wrap: true })[0]!.loops.length);
+  });
+
+  it('keeps outlines closed with the thickest strands at any stickiness', () => {
+    for (const stickiness of [0, 100]) {
+      for (const loop of trace(tub, { stickiness, diagonals: 100 })[0]!.loops) {
+        loop.forEach(([x, y], k) => {
+          const [px, py] = loop[k - 1] ?? loop.at(-1)!;
+          expect(Math.hypot(x - px, y - py)).toBeLessThan(0.5 * CELL);
+        });
+      }
+    }
+  });
+});
+
+describe('diagonalStrand', () => {
+  it('is off at 0 and never jumps as the slider moves', () => {
+    expect(diagonalStrand(0)).toBeNull();
+    for (let d = 1; d < 100; d++) {
+      const a = diagonalStrand(d)!;
+      const b = diagonalStrand(d + 1)!;
+      expect(Math.abs(b.weight - a.weight)).toBeLessThan(0.04);
+      expect(Math.abs(b.reach - a.reach)).toBeLessThan(0.004);
+    }
+  });
+});
+
+describe('strandLevel', () => {
+  it('matches the same lump repeated closely along the line between the two cells', () => {
+    const { reach, weight } = diagonalStrand(70)!;
+    const n = 400;
+    for (const dir of [1, -1] as const) {
+      for (const [px, py] of [[0.5 * dir, 0.5], [0.3 * dir, 0.6], [0.7 * dir, 0.2], [0, 0], [1.2 * dir, 1.1], [0.5 * dir, 0.9]] as const) {
+        let sum = 0;
+        for (let k = 0; k <= n; k++) {
+          const t = k / n;
+          const d2 = (px - dir * t) ** 2 + (py - t) ** 2;
+          const q = 1 - d2 / (reach * reach);
+          if (q > 0) sum += (weight / n) * q * q * q * ((k === 0 || k === n) ? 0.5 : 1);
+        }
+        expect(strandLevel(px, py, dir, reach, weight)).toBeCloseTo(sum, 4);
+      }
+    }
+  });
+});
+
+describe('diagonalLump', () => {
+  const layer = (size: number[], colour = [0, 0, 0, 0], wrap = false) => ({ cols: 2, rows: 2, size, colour, wrap });
+
+  it('is full for two grown cells touching only at a corner, either way', () => {
+    expect(diagonalLump(layer([1, 0, 0, 1]), 0, 0, 1)).toBe(1);
+    expect(diagonalLump(layer([0, 1, 1, 0]), 1, 0, -1)).toBe(1);
+  });
+
+  it('fades in as a newborn grows, and out as a cell between them grows', () => {
+    expect(diagonalLump(layer([1, 0, 0, 0.5]), 0, 0, 1)).toBe(0);
+    expect(diagonalLump(layer([1, 0, 0, 0.8]), 0, 0, 1)).toBeGreaterThan(0);
+    expect(diagonalLump(layer([1, 0.5, 0, 1]), 0, 0, 1)).toBeCloseTo(0.5);
+    expect(diagonalLump(layer([1, 1, 0, 1]), 0, 0, 1)).toBe(0);
+  });
+
+  it('is 0 for different colours, and at the edge unless wrapping', () => {
+    expect(diagonalLump(layer([1, 0, 0, 1], [0, 0, 0, 1]), 0, 0, 1)).toBe(0);
+    expect(diagonalLump(layer([1, 0, 0, 1]), 1, 1, 1)).toBe(0);
+    expect(diagonalLump(layer([1, 0, 0, 1], [0, 0, 0, 0], true), 1, 1, 1)).toBe(1);
   });
 });
