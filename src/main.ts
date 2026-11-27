@@ -100,6 +100,15 @@ new ResizeObserver(() => {
 // ---------------------------------------------------------------------------------------------
 // Loop
 
+/**
+ * How far through the latest step's transition a board is, 0 to 1. Transitions take most of a
+ * step, but never more than 260ms, so slow speeds still snap rather than drift.
+ */
+function tween(now: number, last: number, interval: number): number {
+  if (!settings.smooth || reducedMotion.matches) return 1;
+  return Math.min(1, (now - last) / Math.min(260, interval * 0.85));
+}
+
 function frame(now: number): void {
   const interval = 1000 / settings.speed;
   if (running && now - lastStep >= interval) {
@@ -107,7 +116,7 @@ function frame(now: number): void {
     lastStep = now;
     updateStats();
   }
-  const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - lastStep) / Math.min(260, interval * 0.85));
+  const t = tween(now, lastStep, interval);
   renderer.critters.calm = reducedMotion.matches;
   // Critters' eyes move on their own, so while any are showing the board redraws every frame.
   if (t < 1 || lastT < 1 || dirty || (settings.critters && renderer.critters.active)) {
@@ -393,18 +402,20 @@ function syncSize(): void {
   updateRing();
 }
 
-{
-  // The slider walks SPEED_STEPS, so the slow end can offer fractions of a step per second.
-  const input = el<HTMLInputElement>('#speed');
+/** A speed slider: it walks SPEED_STEPS, so the slow end can offer fractions of a step per second. */
+function bindSpeed(id: string, key: 'speed' | 'labSpeed', onChange: () => void): void {
+  const input = el<HTMLInputElement>(`#${id}`);
   input.min = '0';
   input.max = String(SPEED_STEPS.length - 1);
-  input.value = String(Math.max(0, SPEED_STEPS.indexOf(settings.speed)));
+  input.value = String(Math.max(0, SPEED_STEPS.indexOf(settings[key])));
   input.addEventListener('input', () => {
-    settings.speed = SPEED_STEPS[Number(input.value)] ?? settings.speed;
+    settings[key] = SPEED_STEPS[Number(input.value)] ?? settings[key];
     save();
-    syncBoardPop();
+    onChange();
   });
 }
+
+bindSpeed('speed', 'speed', syncBoardPop);
 bindRange('density', 'density', DENSITY_MIN, DENSITY_MAX, () => {
   fitCanvas();
   fitGrid();
@@ -759,9 +770,9 @@ function runPreview(now: number): void {
     showTrend(trendWatcher.update(preview.cur));
     labGenEl.textContent = `Gen ${preview.gen}`;
   }
-  const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - labLastStep) / (interval * 0.85));
+  const t = tween(now, labLastStep, interval);
   if (t < 1 || labLastT < 1 || labDirty) {
-    previewRenderer.draw(labCtx, preview, previewView, palette(), { style: settings.style, mode: settings.mode, critters: false, stickiness: settings.stickiness, melt: settings.melt, gaps: settings.gaps, wrap: true }, t, now);
+    previewRenderer.draw(labCtx, preview, previewView, palette(), { ...settings, critters: false, wrap: true }, t, now);
     labDirty = false;
   }
   labLastT = t;
@@ -820,17 +831,10 @@ function openLab(): void {
 el('#labBack').addEventListener('click', () => stack.openModal(setDrawer));
 
 // The preview's own speed, on the same steps as the board's, remembered between visits.
-const labSpeedInput = el<HTMLInputElement>('#labSpeed');
 const labSpeedOut = el('#labSpeedOut');
-labSpeedInput.min = '0';
-labSpeedInput.max = String(SPEED_STEPS.length - 1);
-labSpeedInput.value = String(Math.max(0, SPEED_STEPS.indexOf(settings.labSpeed)));
-labSpeedOut.textContent = formatSpeed(settings.labSpeed);
-labSpeedInput.addEventListener('input', () => {
-  settings.labSpeed = SPEED_STEPS[Number(labSpeedInput.value)] ?? settings.labSpeed;
-  labSpeedOut.textContent = formatSpeed(settings.labSpeed);
-  save();
-});
+const syncLabSpeed = () => { labSpeedOut.textContent = formatSpeed(settings.labSpeed); };
+bindSpeed('labSpeed', 'labSpeed', syncLabSpeed);
+syncLabSpeed();
 
 // How rules work: a page over the lab. The lab behind it is inert, so Tab stays on the page.
 const labInfo = el('#labInfo');

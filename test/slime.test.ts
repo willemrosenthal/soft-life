@@ -113,7 +113,7 @@ describe('blockLump', () => {
     expect(blockLump(layer([1, 1, 1, 0.5], [0, 0, 0, 0]), 0, 0)).toBe(0);
   });
 
-  it('is 0 for mixed colours, and past the edge unless wrapping', () => {
+  it('is 0 for mixed colours unless colour is ignored, and 0 past the edge unless wrapping', () => {
     expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 1]), 0, 0)).toBe(0);
     expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 1]), 0, 0, false)).toBe(1);
     expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 0]), 1, 1)).toBe(0);
