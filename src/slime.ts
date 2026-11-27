@@ -43,6 +43,37 @@ export const STICKINESS_MAX = 100;
  */
 export const reachFor = (stickiness: number) => 0.75 + 0.005 * stickiness;
 
+/** A lone lump's edge is at RADIUS × size, the same circles the other styles draw, when the field's level is this. */
+export const thresholdFor = (reach: number) => (1 - (RADIUS / reach) ** 2) ** 3;
+
+/** How far the lump in the middle of a full 2×2 block reaches, in cells. */
+export const BLOCK_LUMP_REACH = 0.6;
+
+/**
+ * Strength (0 to 1) of the small lump in the middle of the 2×2 block whose top-left cell is (x, y).
+ * Without it, low stickiness leaves a pinhole there. It fades in only once all four cells are
+ * mostly grown: earlier, with two diagonal cells full and the others tiny, it would join the
+ * diagonal in a thin stick. With `sameColour` (the default) it is 0 unless all four share a colour.
+ */
+export function blockLump(g: Pick<SlimeLayer, 'cols' | 'rows' | 'size' | 'colour' | 'wrap'>, x: number, y: number, sameColour = true): number {
+  const { cols, rows, size, colour, wrap } = g;
+  let x1 = x + 1;
+  let y1 = y + 1;
+  if (x1 >= cols || y1 >= rows) {
+    if (!wrap) return 0;
+    x1 %= cols;
+    y1 %= rows;
+  }
+  const i = y * cols + x;
+  const r = y * cols + x1;
+  const d = y1 * cols + x;
+  const rd = y1 * cols + x1;
+  const col = colour[i];
+  if (sameColour && (colour[r] !== col || colour[d] !== col || colour[rd] !== col)) return 0;
+  const t = (Math.min(size[i]!, size[r]!, size[d]!, size[rd]!, 1) - 0.6) / 0.4;
+  return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+}
+
 /** Blank rows of samples around the board, in cells. Wide enough for the biggest lump of a wrapped copy. */
 const PAD = 2;
 /** Lumps smaller than this are skipped. */
@@ -96,8 +127,7 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
   const { field: F, marked, blocks, nbA, nbB, px, py, keys, loop } = S;
   // Clamped: past the range, lumps would outgrow PAD and outlines would no longer close.
   const reach = reachFor(Math.max(STICKINESS_MIN, Math.min(STICKINESS_MAX, stickiness)));
-  // A lone lump's edge is at RADIUS × size: the same circles the other styles draw.
-  const T = (1 - (RADIUS / reach) ** 2) ** 3;
+  const T = thresholdFor(reach);
 
   /** Add a lump centred at (x, y) cells, reaching r cells, at strength w, on the sample grid. */
   const splatOne = (x: number, y: number, r: number, w: number) => {
@@ -151,11 +181,6 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
     return { i0: bx * sub, i1: Math.min(W - 1, (bx + 1) * sub), j0: by * sub, j1: Math.min(H - 1, (by + 1) * sub) };
   };
 
-  const at = (x: number, y: number) => {
-    if (wrap) return ((y + rows) % rows) * cols + ((x + cols) % cols);
-    return x < cols && y < rows ? y * cols + x : -1;
-  };
-
   for (let col = 0; col < colours; col++) {
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
@@ -163,17 +188,8 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
         const s = size[i]!;
         if (s <= MIN_SIZE || colour[i] !== col) continue;
         splat(x + 0.5, y + 0.5, reach * s);
-        // A full 2×2 also gets a small lump in its middle; without it, low stickiness leaves a
-        // pinhole there. It fades in only once all four cells are mostly grown: earlier, with two
-        // diagonal cells full and the others tiny, it would join the diagonal in a thin stick.
-        const r = at(x + 1, y);
-        const d = at(x, y + 1);
-        const rd = at(x + 1, y + 1);
-        if (r < 0 || d < 0 || rd < 0) continue;
-        if (colour[r] !== col || colour[d] !== col || colour[rd] !== col) continue;
-        const m = Math.min(s, size[r]!, size[d]!, size[rd]!, 1);
-        const t = (m - 0.6) / 0.4;
-        if (t > 0) splat(x + 1, y + 1, 0.6, t >= 1 ? 1 : t * t * (3 - 2 * t));
+        const lump = blockLump(g, x, y);
+        if (lump > 0) splat(x + 1, y + 1, BLOCK_LUMP_REACH, lump);
       }
     }
     if (!blocks.length) continue;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RADIUS, traceSlime, type PathSink } from '../src/slime';
+import { RADIUS, blockLump, traceSlime, type PathSink } from '../src/slime';
 
 const CELL = 24;
 
@@ -101,5 +101,22 @@ describe('traceSlime', () => {
     // below, and the outline is symmetric about its row.
     const ys = trace(['0..'], { wrap: true })[0]!.loops.flat().map(([, y]) => y);
     expect(Math.min(...ys) + Math.max(...ys)).toBeCloseTo(CELL, 0);
+  });
+});
+
+describe('blockLump', () => {
+  const layer = (size: number[], colour: number[], wrap = false) => ({ cols: 2, rows: 2, size, colour, wrap });
+
+  it('is full for a grown block of one colour, and fades in as the block grows', () => {
+    expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 0]), 0, 0)).toBe(1);
+    expect(blockLump(layer([1, 1, 1, 0.8], [0, 0, 0, 0]), 0, 0)).toBeCloseTo(0.5);
+    expect(blockLump(layer([1, 1, 1, 0.5], [0, 0, 0, 0]), 0, 0)).toBe(0);
+  });
+
+  it('is 0 for mixed colours, and past the edge unless wrapping', () => {
+    expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 1]), 0, 0)).toBe(0);
+    expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 1]), 0, 0, false)).toBe(1);
+    expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 0]), 1, 1)).toBe(0);
+    expect(blockLump(layer([1, 1, 1, 1], [0, 0, 0, 0], true), 1, 1)).toBe(1);
   });
 });

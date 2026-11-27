@@ -1,6 +1,7 @@
 import { Critters } from './critters';
 import type { Life } from './life';
 import type { Palette } from './palettes';
+import { MeltRenderer } from './melt';
 import { RADIUS, traceSlime } from './slime';
 
 /**
@@ -90,6 +91,8 @@ export interface Look {
   mode: ColourMode;
   critters: boolean;
   stickiness: number;
+  /** Goo only: how readily different colours join, 0 (never) to 100. */
+  melt: number;
   wrap: boolean;
 }
 
@@ -113,6 +116,8 @@ export class BoardRenderer {
   readonly critters = new Critters();
   /** Where the brush would draw, shown as a dashed ring; null hides it. */
   brushRing: BrushRing | null = null;
+  /** Made on first use; null if WebGL 2 isn't available. */
+  private meltRenderer: MeltRenderer | null | undefined;
   private paths: Path2D[] | null = null;
   private pathsKey = '';
   private lastSize = new Float32Array(0);
@@ -161,20 +166,7 @@ export class BoardRenderer {
 
     const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
     const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, wrap: look.wrap };
-    // Critters redraw the board every frame even when nothing moves: reuse the outline then,
-    // since tracing goo is the costly part.
-    const key = `${look.style} ${look.stickiness} ${look.wrap} ${colours.length} ${c} ${ox} ${oy}`;
-    if (!this.paths || key !== this.pathsKey || !sameCells(size, this.lastSize) || !sameCells(colour, this.lastColour)) {
-      this.paths = cellPaths(layer);
-      this.pathsKey = key;
-      if (this.lastSize.length !== n) {
-        this.lastSize = new Float32Array(n);
-        this.lastColour = new Int8Array(n);
-      }
-      this.lastSize.set(size);
-      this.lastColour.set(colour);
-    }
-    fillCells(ctx, this.paths, layer);
+    if (!this.drawMelt(ctx, layer, look.melt, width, height)) this.drawFlat(ctx, layer);
 
     if (look.critters) {
       this.critters.draw(ctx, {
@@ -187,6 +179,35 @@ export class BoardRenderer {
       this.critters.reset();
     }
     if (this.brushRing) drawRing(ctx, this.brushRing, view, pal);
+  }
+
+  /** Goo with colour melt, on the GPU. False when it doesn't apply or isn't available. */
+  private drawMelt(ctx: CanvasRenderingContext2D, g: CellLayer, melt: number, width: number, height: number): boolean {
+    // With melt off, or one colour, there's nothing to melt: plain goo looks exactly the same.
+    if (g.style !== 'goo' || melt <= 0 || g.colours.length < 2) return false;
+    if (this.meltRenderer === undefined) this.meltRenderer = MeltRenderer.create();
+    if (!this.meltRenderer) return false;
+    return this.meltRenderer.draw(ctx, { ...g, wrap: g.wrap ?? false, stickiness: g.stickiness ?? 50, melt }, width, height);
+  }
+
+  /**
+   * One flat fill per colour. Critters redraw the board every frame even when nothing moves:
+   * reuse the outline then, since tracing goo is the costly part.
+   */
+  private drawFlat(ctx: CanvasRenderingContext2D, g: CellLayer): void {
+    const n = g.size.length;
+    const key = `${g.style} ${g.stickiness} ${g.wrap} ${g.colours.length} ${g.cell} ${g.ox} ${g.oy}`;
+    if (!this.paths || key !== this.pathsKey || !sameCells(g.size, this.lastSize) || !sameCells(g.colour, this.lastColour)) {
+      this.paths = cellPaths(g);
+      this.pathsKey = key;
+      if (this.lastSize.length !== n) {
+        this.lastSize = new Float32Array(n);
+        this.lastColour = new Int8Array(n);
+      }
+      this.lastSize.set(g.size);
+      this.lastColour.set(g.colour);
+    }
+    fillCells(ctx, this.paths, g);
   }
 }
 
