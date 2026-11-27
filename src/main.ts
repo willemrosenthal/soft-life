@@ -227,6 +227,12 @@ function continuePaint(p: Point): void {
 }
 
 function endPaint(): void {
+  // Rotate: a stroke that drew in a colour (not one that erased) moves the brush on to the next colour.
+  if (painting && settings.rotateColours && brush !== 'erase' && paintColony !== 0) {
+    brush = (brush + 1) % palette().cells.length;
+    buildSwatches();
+    drawBrushPreview();
+  }
   painting = false;
   lastPoint = null;
   updateRing();
@@ -626,11 +632,18 @@ function toast(message: string, action?: { label: string; run: () => void }): vo
 
 const swatchBox = el('#swatches');
 const railSwatch = el('#railSw');
+const rotateBtn = el('#rotate');
+rotateBtn.addEventListener('click', () => {
+  settings.rotateColours = !settings.rotateColours;
+  save();
+  buildSwatches();
+});
 function buildSwatches(): void {
   const colours = palette().cells;
   swatchBox.innerHTML =
     colours.map((c, k) => `<button type="button" class="sw" style="--c:${c}" data-brush="${k}" aria-label="Draw in colour ${k + 1}" aria-pressed="${brush === k}"></button>`).join('') +
     `<button type="button" class="sw erase" data-brush="erase" aria-label="Eraser" aria-pressed="${brush === 'erase'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  rotateBtn.setAttribute('aria-pressed', String(settings.rotateColours));
   railSwatch.classList.toggle('erase', brush === 'erase');
   railSwatch.style.setProperty('--c', brush === 'erase' ? 'transparent' : colours[brush]!);
 }

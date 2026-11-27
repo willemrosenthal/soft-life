@@ -98,6 +98,9 @@ svg { display: block; }
 .stats { font: 500 11px/1.2 var(--mono); color: var(--app-muted); display: flex; gap: 10px; font-variant-numeric: tabular-nums; }
 
 .swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+.chip.rotate { justify-self: start; display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 8px 14px; font-size: 13px; color: var(--app-fg); }
+.chip.rotate[aria-pressed="true"] { color: var(--app-bg); }
+.chip.rotate svg { width: 16px; height: 16px; }
 .sw {
   width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--c);
   box-shadow: 0 0 0 2px var(--app-panel), 0 0 0 2px transparent; transition: box-shadow .15s, transform .15s;

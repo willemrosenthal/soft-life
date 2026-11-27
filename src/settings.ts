@@ -35,6 +35,8 @@ export interface Settings {
   /** How many dots wide a stroke draws. */
   /** Index into BRUSHES. */
   brushStep: number;
+  /** After each stroke drawn in a colour, move on to the next colour in the palette. */
+  rotateColours: boolean;
   /** The tool rail tucked away off the right edge. */
   railHidden: boolean;
   /** The cell style preview in Settings: still shapes, or a live board at the board's speed. */
@@ -63,7 +65,7 @@ export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 0, melt: 75, gaps: 50, brushStep: 0, railHidden: false,
+  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 0, melt: 75, gaps: 50, brushStep: 0, rotateColours: false, railHidden: false,
   stylePreview: 'shapes', stylePreviewShown: false,
 };
 
@@ -98,6 +100,7 @@ export function parseSettings(value: unknown): Settings {
     gaps: int(v.gaps, GAPS_MIN, GAPS_MAX, d.gaps),
     // Older saves kept a width (`brushSize`), from before the in-between brushes.
     brushStep: int(v.brushStep, BRUSH_MIN, BRUSH_MAX, typeof v.brushSize === 'number' ? stepForWidth(v.brushSize) : d.brushStep),
+    rotateColours: flag(v.rotateColours, d.rotateColours),
     railHidden: flag(v.railHidden, d.railHidden),
     stylePreview: oneOf(v.stylePreview, PREVIEWS, d.stylePreview),
     stylePreviewShown: flag(v.stylePreviewShown, d.stylePreviewShown),
