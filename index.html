@@ -271,25 +271,33 @@
       </button>
     </div>
     <div class="panel-body">
-      <div class="preview"><canvas id="themeCv" aria-label="Preview of the theme"></canvas></div>
+      <div class="preview">
+        <canvas id="themeCv" aria-label="Preview of the theme"></canvas>
+        <button type="button" class="ib ib-sm" id="themeSoup" aria-label="Restart the preview from new soup" title="New soup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
       <div class="group"><h3>Your colours<small>Tap one to change it</small></h3><div class="tswatches" id="themeSwatches"></div></div>
+      <!-- The picker for the colour tapped above, opened in place. -->
+      <div class="colour-edit" id="colourEdit" hidden>
+        <div class="colour-head">
+          <h3 id="colourTitle">Background</h3>
+          <button type="button" class="ib ib-sm" id="colourDone" aria-label="Close the colour picker">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+          </button>
+        </div>
+        <hex-color-picker id="colourPicker"></hex-color-picker>
+        <div class="hexrow">
+          <input class="field hex" id="colourHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour">
+          <button type="button" class="ghost" id="colourFix" hidden>Fix contrast</button>
+        </div>
+        <p class="theme-note" id="colourNote"></p>
+      </div>
       <p class="theme-note" id="themeNote"></p>
       <div class="group"><h3><label for="themeName">Name</label></h3><input class="field" id="themeName" type="text" autocomplete="off"></div>
       <button type="button" class="pill pill-wide" id="themeSave">Save and use</button>
       <button type="button" class="ghost danger" id="themeDelete" hidden>Delete this theme</button>
     </div>
-    <!-- Only the colour: rises over the lower part, so the preview stays in view. -->
-    <section class="colour-sheet" id="colourSheet" role="dialog" aria-labelledby="colourTitle" hidden>
-      <div class="demo-grabber" aria-hidden="true"></div>
-      <div class="colour-head"><h3 id="colourTitle">Background</h3><button type="button" class="pill" id="colourDone">Done</button></div>
-      <div class="tswatches strip" id="colourStrip"></div>
-      <hex-color-picker id="colourPicker"></hex-color-picker>
-      <div class="hexrow">
-        <input class="field hex" id="colourHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour">
-        <button type="button" class="ghost" id="colourFix" hidden>Fix contrast</button>
-      </div>
-      <p class="theme-note" id="colourNote"></p>
-    </section>
   </aside>
 
   <!-- Demo sheet: the animated scene behind an (i) button (demos.ts). -->

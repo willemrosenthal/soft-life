@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseRule } from '../src/life';
-import { SURPRISES, TrendWatcher, formatRule, mutateRule, nextRuleName, parseSavedRules, pickSurprise, ruleName, seededRandom } from '../src/rules';
+import { QuietWatcher, SURPRISES, TrendWatcher, formatRule, mutateRule, nextRuleName, parseSavedRules, pickSurprise, ruleName, seededRandom } from '../src/rules';
 
 /** Plays back the given numbers, then repeats the last one. */
 const sequence = (...xs: number[]) => { let i = 0; return () => xs[Math.min(i++, xs.length - 1)]!; };
@@ -103,5 +103,28 @@ describe('naming', () => {
     expect(ruleName('B3/S23', [])).toBe("Conway's Life");
     expect(ruleName('B3/S45678', [])).toBe('Coral');
     expect(ruleName('B1/S1', [])).toBeNull();
+  });
+});
+
+describe('QuietWatcher', () => {
+  const blinker = (phase: number) => { const b = new Array(100).fill(1, 0, 40); b[50 + phase] = 1; return b; };
+
+  it('calls for new soup once a board has settled for long enough', () => {
+    const w = new QuietWatcher(3);
+    const calls = [0, 1, 0, 1, 0, 1].map((k) => w.update(blinker(k)));
+    // Phases repeat from the third generation; three quiet ones in a row makes the fifth call true.
+    expect(calls).toEqual([false, false, false, false, true, true]);
+    w.reset();
+    expect(w.update(blinker(0))).toBe(false);
+  });
+
+  it('counts a nearly empty or dead board as quiet, and any lively generation starts the count again', () => {
+    const w = new QuietWatcher(2, 0.1);
+    const sparse = new Array(100).fill(0); sparse[7] = 1;
+    expect(w.update(sparse)).toBe(false);
+    expect(w.update(new Array(100).fill(0))).toBe(true);
+    const lively = (k: number) => Array.from({ length: 100 }, (_, i) => ((i * 7 + k) % 5 === 0 ? 1 : 0));
+    w.reset();
+    expect([w.update(sparse), w.update(lively(1)), w.update(sparse)]).toEqual([false, false, false]);
   });
 });

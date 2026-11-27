@@ -113,6 +113,31 @@ export class TrendWatcher {
   }
 }
 
+/**
+ * Says when a preview has gone quiet long enough to start afresh: settled down, nearly empty or dead
+ * for `patience` generations in a row. Previews that only show colours (the theme editor's) use it.
+ */
+export class QuietWatcher {
+  private readonly trend = new TrendWatcher();
+  private quiet = 0;
+
+  constructor(private readonly patience = 12, private readonly sparse = 0.06) {}
+
+  reset(): void {
+    this.trend.reset();
+    this.quiet = 0;
+  }
+
+  /** Call once per generation. True when it's time for new soup. */
+  update(cells: ArrayLike<number>): boolean {
+    const t = this.trend.update(cells);
+    let alive = 0;
+    for (let i = 0; i < cells.length; i++) if (cells[i]) alive++;
+    this.quiet = t === 'settled' || t === 'dead' || alive < this.sparse * cells.length ? this.quiet + 1 : 0;
+    return this.quiet >= this.patience;
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Saved rules
 

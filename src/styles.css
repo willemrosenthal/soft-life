@@ -122,6 +122,9 @@ svg { display: block; }
 .panel-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
   padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; align-content: start;
+  /* Rows keep their natural height: when content overflows, a grid squeezes auto rows, and a box sized
+     only by aspect-ratio (the previews) would shrink under its canvas. */
+  grid-auto-rows: max-content;
 }
 
 .search { width: 100%; border: 0; border-radius: 14px; padding: 11px 14px; background: var(--app-panel); color: var(--app-fg); font: inherit; box-shadow: inset 0 0 0 1px var(--app-line); }
@@ -173,7 +176,8 @@ svg { display: block; }
 /* Rule lab: a preview running the rule being edited, the neighbour-count switches, and saved rules. */
 .preview { position: relative; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 18px; overflow: hidden; background: var(--app-bg); box-shadow: inset 0 0 0 1px var(--app-line); }
 .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.preview .ib { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; background: var(--glass); }
+/* Not --glass: that's worked out at the root, and the theme editor wears its own colours. */
+.preview .ib { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; background: color-mix(in srgb, var(--app-panel) 88%, transparent); }
 .preview .ib svg { width: 16px; height: 16px; }
 .trend {
   position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 99px;
@@ -346,9 +350,6 @@ svg { display: block; }
   position: absolute; top: -3px; right: -3px; width: 15px; height: 15px; border-radius: 50%; box-shadow: 0 0 0 2px var(--app-bg);
   background: #E0A100; color: #1A1A1A; font: 700 10px/15px var(--mono); text-align: center;
 }
-.strip .tsw { max-width: 30px; }
-.strip .tsw-bg { max-width: none; height: 30px; border-radius: 9px; }
-.strip .tsw-warn { width: 12px; height: 12px; font-size: 8px; line-height: 12px; }
 .theme-note { margin: 0; font-size: 12px; color: var(--app-muted); }
 .theme-note.warn { color: var(--app-fg); }
 .theme-note.warn::before {
@@ -356,15 +357,13 @@ svg { display: block; }
   border-radius: 50%; background: #E0A100; color: #1A1A1A; font: 700 10px var(--mono);
 }
 .ghost.danger { justify-self: center; color: #C4473C; box-shadow: none; background: none; }
-.colour-sheet {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; max-height: 64%; overflow-y: auto; overscroll-behavior: contain;
-  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) 16px;
-  border-radius: 24px 24px 0 28px; background: var(--app-bg); box-shadow: 0 -1px 0 var(--app-line), 0 -18px 40px -22px rgba(0, 0, 0, .5);
-  display: grid; gap: 12px; grid-auto-rows: max-content; animation: sheet-rise .28s var(--ease);
+.colour-edit {
+  display: grid; gap: 10px; padding: 12px; border-radius: 16px; background: var(--app-panel); box-shadow: inset 0 0 0 1px var(--app-line);
+  animation: colour-open .2s var(--ease);
 }
-@keyframes sheet-rise { from { transform: translateY(100%); } }
+@keyframes colour-open { from { opacity: 0; transform: translateY(-6px); } }
 .colour-head { display: flex; align-items: center; gap: 8px; }
-.colour-head h3 { margin: 0 auto 0 0; font: 800 17px/1.1 var(--display); letter-spacing: -.01em; }
+.colour-head h3 { margin: 0 auto 0 0; font: 700 15px/1.1 var(--display); letter-spacing: -.01em; }
 #colourPicker { width: 100%; height: 170px; }
 #colourPicker::part(saturation) { border-radius: 12px 12px 0 0; }
 #colourPicker::part(hue) { height: 20px; border-radius: 0 0 12px 12px; }

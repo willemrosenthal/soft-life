@@ -19,7 +19,7 @@ import { PATTERNS, type PatternCategory } from './patterns';
 import { BoardRenderer, drawCells, type View } from './render';
 import { MiniBoard } from './miniboard';
 import {
-  NAME_MAX, PRESETS, TREND_LABELS, TrendWatcher, formatRule, loadRules, mutateRule, nextRuleName, pickSurprise, ruleName,
+  NAME_MAX, PRESETS, QuietWatcher, TREND_LABELS, TrendWatcher, formatRule, loadRules, mutateRule, nextRuleName, pickSurprise, ruleName,
   saveRules, seededRandom, type SavedRule, type Trend,
 } from './rules';
 import { DENSITY_MAX, DENSITY_MIN, formatSpeed, loadSettings, saveSettings, SPEED_STEPS, type Settings } from './settings';
@@ -316,7 +316,7 @@ const labDrawer = stack.add('lab', new Drawer(labPanel, true, (open) => {
 // The theme editor opens from Settings too.
 const themePanel = el('#themePanel');
 const themeDrawer = stack.add('theme', new Drawer(themePanel, true, (open) => {
-  if (!open) closeColourSheet(false);
+  if (!open) pickColour(null);
   panelToggled(themePanel, setButton, open);
   if (open) themeBoard.fit();
   else clearEditorColours();
@@ -1012,18 +1012,19 @@ const themeNote = el('#themeNote');
 const themeName = el<HTMLInputElement>('#themeName');
 themeName.maxLength = THEME_NAME_MAX;
 const themeDelete = el('#themeDelete');
-const colourSheet = el('#colourSheet');
-const colourStrip = el('#colourStrip');
+const colourEdit = el('#colourEdit');
 const colourPicker = el<HTMLElementTagNameMap['hex-color-picker']>('#colourPicker');
 const colourHex = el<HTMLInputElement>('#colourHex');
 const colourFix = el('#colourFix');
 const colourNote = el('#colourNote');
 const themeBoard = miniBoard(el<HTMLCanvasElement>('#themeCv'), THEME_PREVIEW_COLS, THEME_PREVIEW_ROWS);
+const themeQuiet = new QuietWatcher();
 /** The theme being edited; `editingTheme` is its id once saved, so Save updates instead of adding. */
 let draft: CustomTheme = { id: '', name: '', bg: PALETTES.meadow.bg, cells: [...PALETTES.meadow.cells] };
 let draftPalette: Palette = derivePalette(draft);
 let editingTheme: string | null = null;
-let colourTarget = BG;
+/** The colour the picker is open on, or null while it's folded away. */
+let colourTarget: number | null = null;
 const EDITOR_VARS = ['bg', 'fg', 'panel', 'line', 'muted', 'accent'] as const;
 
 const colourOf = (i: number) => (i === BG ? draft.bg : draft.cells[i]!);
@@ -1038,9 +1039,8 @@ function openThemeEditor(theme: CustomTheme | null): void {
   themeName.value = theme?.name ?? '';
   themeName.placeholder = theme?.name ?? nextThemeName(customThemes);
   themeDelete.hidden = !theme;
-  closeColourSheet(false);
-  renderEditor();
-  themeBoard.restart();
+  pickColour(null);
+  restartThemePreview();
   stack.openModal(themeDrawer);
 }
 
@@ -1052,14 +1052,13 @@ function clearEditorColours(): void {
   for (const k of EDITOR_VARS) themePanel.style.removeProperty(`--app-${k}`);
 }
 
-/** The seven swatches. `strip` is the small row in the colour sheet: no captions. */
-function swatchRow(strip: boolean): string {
-  const sheetOpen = !colourSheet.hidden;
+/** The seven swatches; the one the picker is open on is pressed. */
+function swatchRow(): string {
   return [BG, ...draft.cells.keys()].map((i) => {
     const hex = colourOf(i);
     const weak = i !== BG && hardToSee(hex, draft.bg);
-    return `<div class="tsw-col"><button type="button" class="tsw${i === BG ? ' tsw-bg' : ''}" data-colour="${i}" aria-pressed="${sheetOpen && colourTarget === i}" style="--c:${hex}" aria-label="${colourName(i)} ${hex}${weak ? ', hard to see' : ''}">`
-      + `${weak ? '<span class="tsw-warn" aria-hidden="true">!</span>' : ''}</button>${strip ? '' : `<small>${i === BG ? 'Background' : i + 1}</small>`}</div>`;
+    return `<div class="tsw-col"><button type="button" class="tsw${i === BG ? ' tsw-bg' : ''}" data-colour="${i}" aria-pressed="${colourTarget === i}" aria-controls="colourEdit" style="--c:${hex}" aria-label="${colourName(i)} ${hex}${weak ? ', hard to see' : ''}">`
+      + `${weak ? '<span class="tsw-warn" aria-hidden="true">!</span>' : ''}</button><small>${i === BG ? 'Background' : i + 1}</small></div>`;
   }).join('');
 }
 
@@ -1068,15 +1067,15 @@ function renderEditor(fromPicker = false): void {
   draftPalette = derivePalette(draft);
   paintEditor(draftPalette);
   themeBoard.invalidate();
-  themeSwatches.innerHTML = swatchRow(false);
+  themeSwatches.innerHTML = swatchRow();
   const weak = draft.cells.filter((c) => hardToSee(c, draft.bg)).length;
   themeNote.className = weak ? 'theme-note warn' : 'theme-note';
   themeNote.textContent = weak
     ? `${weak} colour${weak > 1 ? 's are' : ' is'} hard to see on the background. Tap ${weak > 1 ? 'one' : 'it'} to fix.`
     : 'Text, panels and the rest are worked out from these seven.';
-  if (colourSheet.hidden) return;
+  colourEdit.hidden = colourTarget === null;
+  if (colourTarget === null) return;
   const hex = colourOf(colourTarget);
-  colourStrip.innerHTML = swatchRow(true);
   el('#colourTitle').textContent = colourName(colourTarget);
   if (!fromPicker) colourPicker.color = hex;
   if (document.activeElement !== colourHex) colourHex.value = hex;
@@ -1089,6 +1088,7 @@ function renderEditor(fromPicker = false): void {
 }
 
 function setColour(hex: string, fromPicker = false): void {
+  if (colourTarget === null) return;
   hex = hex.toUpperCase();
   if (hex === colourOf(colourTarget)) return;
   if (colourTarget === BG) draft.bg = hex;
@@ -1096,49 +1096,51 @@ function setColour(hex: string, fromPicker = false): void {
   renderEditor(fromPicker);
 }
 
-// The colour sheet covers only the lower part, so the preview stays in view. The rest of the editor
-// is inert behind it, so Tab stays in the sheet.
-const editorMain = [el('.panel-head', themePanel), el('.panel-body', themePanel)];
-function openColourSheet(i: number): void {
+/** Open the picker under the swatches on colour `i`, or fold it away (null). */
+function pickColour(i: number | null): void {
   colourTarget = i;
-  colourSheet.hidden = false;
-  for (const part of editorMain) part.inert = true;
   renderEditor();
-  el<HTMLElement>('#colourDone').focus({ preventScroll: true });
-}
-function closeColourSheet(restoreFocus = true): void {
-  if (colourSheet.hidden) return;
-  colourSheet.hidden = true;
-  for (const part of editorMain) part.inert = false;
-  renderEditor();
-  if (restoreFocus) el<HTMLElement>(`[data-colour="${colourTarget}"]`, themeSwatches).focus({ preventScroll: true });
+  if (i !== null) colourEdit.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 }
 
-themePanel.addEventListener('click', (e) => {
+/** Fold the picker away and put focus back on the swatch it was open on. */
+function closePicker(): void {
+  const was = colourTarget;
+  pickColour(null);
+  if (was !== null) el<HTMLElement>(`[data-colour="${was}"]`, themeSwatches).focus({ preventScroll: true });
+}
+
+themeSwatches.addEventListener('click', (e) => {
   const sw = (e.target as Element).closest<HTMLElement>('[data-colour]');
   if (!sw) return;
   const i = Number(sw.dataset.colour);
-  if (colourSheet.hidden) openColourSheet(i);
-  else {
-    colourTarget = i;
-    renderEditor();
-  }
+  // Tapping the colour that's open folds the picker away.
+  pickColour(i === colourTarget ? null : i);
 });
-el('#colourDone').addEventListener('click', () => closeColourSheet());
+el('#colourDone').addEventListener('click', closePicker);
 colourPicker.addEventListener('color-changed', (e) => setColour((e as CustomEvent<{ value: string }>).detail.value, true));
 colourHex.addEventListener('input', () => {
   const v = colourHex.value.trim();
   const hex = v.startsWith('#') ? v : `#${v}`;
   if (isHex(hex)) setColour(hex);
 });
-colourHex.addEventListener('blur', () => { colourHex.value = colourOf(colourTarget); });
-colourFix.addEventListener('click', () => setColour(standOut(colourOf(colourTarget), draft.bg)));
+colourHex.addEventListener('blur', () => { if (colourTarget !== null) colourHex.value = colourOf(colourTarget); });
+colourFix.addEventListener('click', () => { if (colourTarget !== null) setColour(standOut(colourOf(colourTarget), draft.bg)); });
 el('#themeBack').addEventListener('click', () => stack.openModal(setDrawer));
 
-/** Called from the main loop while the editor is showing: a soup in the draft's colours, reseeded when it dies. */
+function restartThemePreview(): void {
+  themeBoard.restart();
+  themeQuiet.reset();
+}
+el('#themeSoup').addEventListener('click', restartThemePreview);
+
+/**
+ * Called from the main loop while the editor is showing: a soup in the draft's colours. Once it has
+ * settled down, thinned out or died for a while, it starts afresh, so there's always colour to judge.
+ */
 function runThemePreview(now: number): void {
-  if (themeBoard.run(now, rule, THEME_PREVIEW_SPEED, draftPalette, { ...settings, mode: 'colonies', wrap: true }) && !themeBoard.life.population()) {
-    themeBoard.restart();
+  if (themeBoard.run(now, rule, THEME_PREVIEW_SPEED, draftPalette, { ...settings, mode: 'colonies', wrap: true }) && themeQuiet.update(themeBoard.life.cur)) {
+    restartThemePreview();
   }
 }
 
@@ -1226,7 +1228,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (activeDemo) closeDemo();
     else if (pops.some((p) => !p.hidden)) closePops(true);
-    else if (!colourSheet.hidden) closeColourSheet();
+    else if (colourTarget !== null && themeDrawer.isOpen) closePicker();
     else if (!labInfo.hidden) showLabInfo(false);
     else stack.topModal()?.setOpen(false);
     return;
