@@ -104,11 +104,11 @@ svg { display: block; }
   background: color-mix(in srgb, var(--app-bg) 94%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
   border-radius: 28px 0 0 28px; box-shadow: -12px 0 44px -16px rgba(0, 0, 0, .45);
 }
-.sheet-head { display: flex; align-items: center; gap: 10px; padding: 18px 14px 12px 20px; flex: none; }
-.sheet-head h2 { margin: 0; font: 800 20px/1 var(--display); letter-spacing: -.02em; }
-.sheet-head .stats { margin-left: auto; }
-.sheet-head h2 + .ib { margin-left: auto; }
-.sheet-body {
+.panel-head { display: flex; align-items: center; gap: 10px; padding: 18px 14px 12px 20px; flex: none; }
+.panel-head h2 { margin: 0; font: 800 20px/1 var(--display); letter-spacing: -.02em; }
+.panel-head .stats { margin-left: auto; }
+.panel-head h2 + .ib { margin-left: auto; }
+.panel-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
   padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; align-content: start;
 }

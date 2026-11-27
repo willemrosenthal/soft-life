@@ -204,15 +204,15 @@ canvas.addEventListener('pointermove', (e) => {
   setHover(p, e.pointerType === 'mouse');
   if (painting) continuePaint(p);
 });
-for (const type of ['pointerup', 'pointercancel'] as const) {
-  canvas.addEventListener(type, (e) => {
-    endPaint();
-    if (e.pointerType !== 'mouse') {
-      renderer.critters.pointer = null;
-      setHover(null, false);
-    }
-  });
+/** The stroke is over. A finger or pen has also left the screen, so nothing should follow it any more. */
+function pointerDone(e: PointerEvent): void {
+  endPaint();
+  if (e.pointerType !== 'mouse') {
+    renderer.critters.pointer = null;
+    setHover(null, false);
+  }
 }
+for (const type of ['pointerup', 'pointercancel'] as const) canvas.addEventListener(type, pointerDone);
 canvas.addEventListener('pointerleave', () => {
   renderer.critters.pointer = null;
   if (!painting) setHover(null, false);
@@ -236,8 +236,12 @@ function railToggled(open: boolean): void {
   if (!open) closePops();
 }
 
-/** A panel opened or closed: focus moves in, and back to the rail button that opened it. */
+/**
+ * A panel opened or closed: focus moves in, and back to the rail button that opened it. While a
+ * panel is open the rail behind it is inert, so Tab stays in the panel.
+ */
 function panelToggled(panel: HTMLElement, opener: HTMLElement, open: boolean): void {
+  railEl.inert = open || !rail.isOpen;
   if (open) {
     closePops();
     el<HTMLElement>('[data-close]', panel).focus({ preventScroll: true });
@@ -253,7 +257,7 @@ const stack = new DrawerStack(app, el('#shade'), {
   canvas,
   onEdgeDraw: (down, ended) => {
     startPaint(down);
-    if (ended) endPaint();
+    if (ended) pointerDone(down);
   },
 });
 stack.add('rail', rail);
@@ -274,9 +278,12 @@ for (const panel of [libPanel, setPanel]) {
 const popButtons = [...railEl.querySelectorAll<HTMLElement>('[data-pop]')];
 const pops = popButtons.map((b) => el(`#${b.dataset.pop}`));
 
-function closePops(): void {
+/** Close any open pop-up; with `restoreFocus`, focus goes back to the rail button that opened it. */
+function closePops(restoreFocus = false): void {
+  const opener = popButtons.find((b) => b.getAttribute('aria-expanded') === 'true');
   pops.forEach((p) => { p.hidden = true; });
   popButtons.forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  if (restoreFocus) opener?.focus({ preventScroll: true });
 }
 
 function togglePop(button: HTMLElement): void {
@@ -294,6 +301,8 @@ function togglePop(button: HTMLElement): void {
   const top = b.top - a.top + b.height / 2 - pop.offsetHeight / 2;
   pop.style.top = `${Math.max(12, Math.min(top, a.height - pop.offsetHeight - 12))}px`;
   if (pop.id === 'sizePop') drawBrushPreview();
+  // Pop-ups come after the rail in the page, so move focus in or a keyboard could never reach them.
+  el<HTMLElement>('input, button', pop).focus({ preventScroll: true });
 }
 
 popButtons.forEach((b) => b.addEventListener('click', () => togglePop(b)));
@@ -302,7 +311,7 @@ document.addEventListener('pointerdown', (e) => {
   const t = e.target as Element;
   if (pops.some((p) => !p.hidden && !p.contains(t)) && !t.closest('[data-pop]')) closePops();
 }, true);
-window.addEventListener('resize', closePops);
+window.addEventListener('resize', () => closePops());
 
 // ---------------------------------------------------------------------------------------------
 // Controls
@@ -418,7 +427,7 @@ swatchBox.addEventListener('click', (e) => {
   buildSwatches();
   drawBrushPreview();
   updateRing();
-  closePops();
+  closePops(true);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -626,7 +635,7 @@ window.addEventListener('hashchange', () => { loadFromLink(); });
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'Escape') {
-    if (pops.some((p) => !p.hidden)) closePops();
+    if (pops.some((p) => !p.hidden)) closePops(true);
     else stack.topModal()?.setOpen(false);
     return;
   }
@@ -649,7 +658,7 @@ syncSettingsPanel();
 buildLibrary();
 syncSize();
 rail.setOpen(!settings.railHidden, false);
-railToggled(rail.isOpen);
+railToggled(rail.isOpen); // setOpen only reports changes, and a rail that starts hidden hasn't changed
 fitCanvas();
 fitGrid();
 syncBoardPop();
