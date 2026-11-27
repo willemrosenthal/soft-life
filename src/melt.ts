@@ -17,6 +17,8 @@ import { BLOCK_LUMP_REACH, blockLump, reachFor, thresholdFor, type SlimeLayer } 
 
 export const MELT_MIN = 0;
 export const MELT_MAX = 100;
+export const GAPS_MIN = 0;
+export const GAPS_MAX = 100;
 
 /** Most colours a palette has (colonies: 6). */
 const MAX_COLOURS = 8;
@@ -24,6 +26,18 @@ const MAX_COLOURS = 8;
 const MAX_SCALE = 2;
 /** How quickly one colour gives way to the next: 1 is a straight mix of the fields; higher is crisper. */
 const BLEND = 1.3;
+
+/**
+ * Strength of the lump in the middle of a mixed-colour block, for a gaps setting of 0 to 100. From 0
+ * to 50 it goes from filling the pinhole to leaving it alone; past 50 it turns negative and opens
+ * the hole wider. The negative side is much gentler and eases in: the middle of a mixed block is
+ * already just under the edge level, so even a small push opens a big hole.
+ */
+export function mixedLumpFor(gaps: number): number {
+  const t = gaps / GAPS_MAX;
+  const u = 2 * t - 1;
+  return t <= 0.5 ? -u : -0.15 * u * u;
+}
 
 const VERTEX = `#version 300 es
 in vec2 aPos;
@@ -67,7 +81,7 @@ void main() {
   ivec2 base = ivec2(floor(g));
   float F[${MAX_COLOURS}];
   for (int k = 0; k < ${MAX_COLOURS}; k++) F[k] = 0.0;
-  float mixed = 0.0; // lumps in the middle of mixed-colour blocks: shape only, no colour
+  float mixed = 0.0; // lumps in the middle of mixed-colour blocks (negative opens a gap): shape only
   // A lump reaches at most 1.35 cells, so cells two away in each direction are enough.
   for (int dy = -2; dy <= 2; dy++) {
     for (int dx = -2; dx <= 2; dx++) {
@@ -81,7 +95,7 @@ void main() {
       vec2 d = g - (vec2(c) + 0.5);
       float q = 1.0 - dot(d, d) / (r * r);
       float add = q > 0.0 ? q * q * q : 0.0;
-      if (cell.b + cell.a > 0.0) {
+      if (cell.b != 0.0 || cell.a != 0.0) { // a is negative when opening gaps
         vec2 e = g - (vec2(c) + 1.0);
         float ql = max(0.0, 1.0 - dot(e, e) / (uLumpReach * uLumpReach));
         add += cell.b * ql * ql * ql;
@@ -120,6 +134,11 @@ export interface MeltLayer extends SlimeLayer {
   stickiness: number;
   /** 0 to 100, as in settings. */
   melt: number;
+  /**
+   * 0 to 100, as in settings: the holes where four cells of mixed colours meet. 0 fills them,
+   * 50 leaves the field as it is (small pinholes), 100 pushes them open wider.
+   */
+  gaps: number;
 }
 
 export class MeltRenderer {
@@ -188,11 +207,12 @@ export class MeltRenderer {
     gl.viewport(0, 0, w, h);
 
     // Cells as a float texture: size, colour, and the lump in the middle of the block it starts:
-    // in its own colour if the block is all one colour, else shape-only (without it, four cells of
-    // mixed colours leave a pinhole in the middle).
+    // in its own colour if the block is all one colour, else shape-only. Four cells of mixed
+    // colours leave a pinhole in the middle; that lump fills it, or makes it wider when negative.
     const n = cols * rows;
     if (this.cells.length !== n * 4) this.cells = new Float32Array(n * 4);
     const data = this.cells;
+    const mixedLump = mixedLumpFor(g.gaps);
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const i = y * cols + x;
@@ -201,7 +221,7 @@ export class MeltRenderer {
         data[i * 4 + 1] = colour[i]!;
         const same = s > 0 ? blockLump(g, x, y) : 0;
         data[i * 4 + 2] = same;
-        data[i * 4 + 3] = s > 0 && !same ? blockLump(g, x, y, false) : 0;
+        data[i * 4 + 3] = s > 0 && !same && mixedLump !== 0 ? mixedLump * blockLump(g, x, y, false) : 0;
       }
     }
     gl.activeTexture(gl.TEXTURE0);

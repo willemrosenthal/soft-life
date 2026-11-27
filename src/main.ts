@@ -16,7 +16,7 @@ import {
   saveRules, seededRandom, type SavedRule, type Trend,
 } from './rules';
 import { DENSITY_MAX, DENSITY_MIN, loadSettings, saveSettings, type Settings } from './settings';
-import { MELT_MAX, MELT_MIN } from './melt';
+import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
 
@@ -361,7 +361,7 @@ el('#btnClear').addEventListener('click', () => {
 el('#btnShare').addEventListener('click', () => void share());
 
 /** A range input bound to a numeric setting, with its readout. */
-function bindRange(id: string, key: 'speed' | 'density' | 'brushSize' | 'stickiness' | 'melt', min: number, max: number, onChange: () => void): HTMLInputElement {
+function bindRange(id: string, key: 'speed' | 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps', min: number, max: number, onChange: () => void): HTMLInputElement {
   const input = el<HTMLInputElement>(`#${id}`);
   input.min = String(min);
   input.max = String(max);
@@ -399,10 +399,14 @@ bindRange('size', 'brushSize', BRUSH_MIN, BRUSH_MAX, syncSize);
 
 const stickyOut = el('#stickyOut');
 const meltOut = el('#meltOut');
-/** Stickiness and colour melt only mean something in the goo style. */
+const gapsOut = el('#gapsOut');
+/** Stickiness and colour melt only mean something in the goo style, and gaps only with melt on. */
 function syncGoo(): void {
   el('#stickyRow').hidden = settings.style !== 'goo';
   el('#meltRow').hidden = settings.style !== 'goo';
+  el('#gapsRow').hidden = settings.style !== 'goo' || settings.melt === 0;
+  const gp = settings.gaps;
+  gapsOut.textContent = gp < 15 ? 'Closed' : gp < 40 ? 'Tiny' : gp < 65 ? 'Pinholes' : gp < 90 ? 'Holes' : 'Wide';
   const s = settings.stickiness;
   stickyOut.textContent = s < 25 ? 'Tight' : s < 45 ? 'Soft' : s < 65 ? 'Gooey' : s < 85 ? 'Gloopy' : 'Sticky';
   const m = settings.melt;
@@ -413,11 +417,13 @@ bindRange('stickiness', 'stickiness', STICKINESS_MIN, STICKINESS_MAX, () => {
   restyle();
 });
 // Only the boards melt colours; the thumbnails stay plain goo.
-bindRange('melt', 'melt', MELT_MIN, MELT_MAX, () => {
+const redrawBoards = () => {
   syncGoo();
   labDirty = true;
   dirty = true;
-});
+};
+bindRange('melt', 'melt', MELT_MIN, MELT_MAX, redrawBoards);
+bindRange('gaps', 'gaps', GAPS_MIN, GAPS_MAX, redrawBoards);
 syncGoo();
 
 /** The brush's footprint, drawn in the current colour (or grey for the eraser). */
@@ -742,7 +748,7 @@ function runPreview(now: number): void {
   }
   const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - labLastStep) / (interval * 0.85));
   if (t < 1 || labLastT < 1 || labDirty) {
-    previewRenderer.draw(labCtx, preview, previewView, palette(), { style: settings.style, mode: settings.mode, critters: false, stickiness: settings.stickiness, melt: settings.melt, wrap: true }, t, now);
+    previewRenderer.draw(labCtx, preview, previewView, palette(), { style: settings.style, mode: settings.mode, critters: false, stickiness: settings.stickiness, melt: settings.melt, gaps: settings.gaps, wrap: true }, t, now);
     labDirty = false;
   }
   labLastT = t;

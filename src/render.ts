@@ -93,6 +93,8 @@ export interface Look {
   stickiness: number;
   /** Goo only: how readily different colours join, 0 (never) to 100. */
   melt: number;
+  /** Goo with melt: the holes where mixed colours meet, 0 (closed) to 100 (wide). */
+  gaps: number;
   wrap: boolean;
 }
 
@@ -166,7 +168,7 @@ export class BoardRenderer {
 
     const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
     const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, wrap: look.wrap };
-    if (!this.drawMelt(ctx, layer, look.melt, width, height)) this.drawFlat(ctx, layer);
+    if (!this.drawMelt(ctx, layer, look, width, height)) this.drawFlat(ctx, layer);
 
     if (look.critters) {
       this.critters.draw(ctx, {
@@ -182,12 +184,12 @@ export class BoardRenderer {
   }
 
   /** Goo with colour melt, on the GPU. False when it doesn't apply or isn't available. */
-  private drawMelt(ctx: CanvasRenderingContext2D, g: CellLayer, melt: number, width: number, height: number): boolean {
+  private drawMelt(ctx: CanvasRenderingContext2D, g: CellLayer, look: Look, width: number, height: number): boolean {
     // With melt off, or one colour, there's nothing to melt: plain goo looks exactly the same.
-    if (g.style !== 'goo' || melt <= 0 || g.colours.length < 2) return false;
+    if (g.style !== 'goo' || look.melt <= 0 || g.colours.length < 2) return false;
     if (this.meltRenderer === undefined) this.meltRenderer = MeltRenderer.create();
     if (!this.meltRenderer) return false;
-    return this.meltRenderer.draw(ctx, { ...g, wrap: g.wrap ?? false, stickiness: g.stickiness ?? 50, melt }, width, height);
+    return this.meltRenderer.draw(ctx, { ...g, wrap: look.wrap, stickiness: look.stickiness, melt: look.melt, gaps: look.gaps }, width, height);
   }
 
   /**
