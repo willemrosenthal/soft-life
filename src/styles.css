@@ -12,13 +12,16 @@
 * { box-sizing: border-box; }
 /* `hidden` always wins, even over components that set their own display (pop-ups, toast). */
 [hidden] { display: none !important; }
-html, body { height: 100%; }
+/* No page zoom: pinch is blocked here (children that set their own touch-action narrow it further). */
+html, body { height: 100%; touch-action: pan-x pan-y; }
 body {
   margin: 0; background: var(--app-bg); color: var(--app-fg);
   font: 13px/1.5 var(--body); -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none; transition: background-color .3s, color .3s; overflow: hidden;
 }
 button { font: inherit; color: inherit; }
+/* iOS zooms the page in on focus of any text field under 16px, and with the page locked it stays zoomed. */
+input:not([type=range]), textarea, select { font-size: max(16px, 1em) !important; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 svg { display: block; }
 
@@ -289,6 +292,7 @@ svg { display: block; }
 .demo-sheet {
   position: absolute; z-index: 40; left: 50%; bottom: 0; width: min(100%, 440px); transform: translateX(-50%);
   max-height: calc(100% - 16px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
+  touch-action: pan-y;
   padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   border-radius: 26px 26px 0 0; background: var(--app-bg); box-shadow: 0 -16px 44px -18px rgba(0, 0, 0, .5);
   display: grid; gap: 12px; animation: sheet-up .32s var(--ease);

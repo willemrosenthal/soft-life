@@ -31,6 +31,9 @@ import { createDemo, type Demo, type DemoHost, type DemoKey } from './demos';
 /** Wait this long after the board stops changing size before adding or removing rows. */
 const REGRID_DELAY = 120;
 
+// iOS Safari ignores the viewport's no-zoom setting for pinches; its own gesture events can still be cancelled.
+for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 function el<T extends Element = HTMLElement>(selector: string, root: ParentNode = document): T {
