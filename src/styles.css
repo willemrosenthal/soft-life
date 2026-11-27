@@ -28,14 +28,6 @@ svg { display: block; }
 /* App: the board fills the whole screen, under the system bars too. Everything else floats over it. */
 .app { position: relative; height: 100dvh; overflow: hidden; isolation: isolate; }
 .board { position: absolute; inset: 0; }
-/* Installed on iOS, the status bar's text is always white (index.html), so on a light theme a soft shade sits behind it. */
-@media (display-mode: standalone) { @supports (-webkit-touch-callout: none) { /* iOS only: elsewhere the status bar is separate. */
-  .light-bg .app::before {
-    content: ""; position: absolute; inset: 0 0 auto; z-index: 60; pointer-events: none;
-    height: calc(env(safe-area-inset-top, 0px) + 14px);
-    background: linear-gradient(rgba(0, 0, 0, .32), rgba(0, 0, 0, .16) 60%, transparent);
-  }
-} }
 .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
 .toast {
   position: absolute; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); max-width: calc(100% - 24px);

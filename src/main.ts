@@ -849,7 +849,6 @@ function applyTheme(): void {
   root.setProperty('--app-muted', p.muted);
   root.setProperty('--app-accent', p.accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg);
-  document.documentElement.classList.toggle('light-bg', !isDark(p.bg));
   buildThemes();
   buildSwatches();
   drawThumbnails();
