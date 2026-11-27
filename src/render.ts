@@ -167,8 +167,12 @@ export class BoardRenderer {
     if (!this.paths || key !== this.pathsKey || !sameCells(size, this.lastSize) || !sameCells(colour, this.lastColour)) {
       this.paths = cellPaths(layer);
       this.pathsKey = key;
-      this.lastSize = size.slice();
-      this.lastColour = colour.slice();
+      if (this.lastSize.length !== n) {
+        this.lastSize = new Float32Array(n);
+        this.lastColour = new Int8Array(n);
+      }
+      this.lastSize.set(size);
+      this.lastColour.set(colour);
     }
     fillCells(ctx, this.paths, layer);
 

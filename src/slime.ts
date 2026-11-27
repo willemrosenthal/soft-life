@@ -94,7 +94,8 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
   const S = scratch;
   S.fit(W * H, BW * BH);
   const { field: F, marked, blocks, nbA, nbB, px, py, keys, loop } = S;
-  const reach = reachFor(stickiness);
+  // Clamped: past the range, lumps would outgrow PAD and outlines would no longer close.
+  const reach = reachFor(Math.max(STICKINESS_MIN, Math.min(STICKINESS_MAX, stickiness)));
   // A lone lump's edge is at RADIUS × size: the same circles the other styles draw.
   const T = (1 - (RADIUS / reach) ** 2) ** 3;
 
@@ -132,10 +133,22 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
   const splat = (x: number, y: number, r: number, w = 1) => {
     splatOne(x, y, r, w);
     if (!wrap) return;
+    // On a tiny board a lump can be near both edges at once, so check each side separately.
     const near = r + 0.5;
-    const xs = x < near ? [x, x + cols] : x > cols - near ? [x, x - cols] : [x];
-    const ys = y < near ? [y, y + rows] : y > rows - near ? [y, y - rows] : [y];
+    const xs = [x];
+    const ys = [y];
+    if (x < near) xs.push(x + cols);
+    if (x > cols - near) xs.push(x - cols);
+    if (y < near) ys.push(y + rows);
+    if (y > rows - near) ys.push(y - rows);
     for (const wy of ys) for (const wx of xs) if (wx !== x || wy !== y) splatOne(wx, wy, r, w);
+  };
+
+  /** A block's samples: columns i0..i1 and rows j0..j1, inclusive. */
+  const range = (b: number) => {
+    const bx = b % BW;
+    const by = (b / BW) | 0;
+    return { i0: bx * sub, i1: Math.min(W - 1, (bx + 1) * sub), j0: by * sub, j1: Math.min(H - 1, (by + 1) * sub) };
   };
 
   const at = (x: number, y: number) => {
@@ -180,12 +193,9 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
       if (nbA[b] === -1) { nbA[b] = a; keys.push(b); } else nbB[b] = a;
     };
     for (const b of blocks) {
-      const bx = b % BW;
-      const by = (b / BW) | 0;
-      const iEnd = Math.min(W - 1, (bx + 1) * sub);
-      const jEnd = Math.min(H - 1, (by + 1) * sub);
-      for (let j = by * sub; j < jEnd; j++) {
-        for (let i = bx * sub; i < iEnd; i++) {
+      const { i0, i1, j0, j1 } = range(b);
+      for (let j = j0; j < j1; j++) {
+        for (let i = i0; i < i1; i++) {
           const v = j * W + i;
           const tl = F[v]!, tr = F[v + 1]!, br = F[v + W + 1]!, bl = F[v + W]!;
           const cs = (tl >= T ? 8 : 0) | (tr >= T ? 4 : 0) | (br >= T ? 2 : 0) | (bl >= T ? 1 : 0);
@@ -246,11 +256,8 @@ export function traceSlime(g: SlimeLayer, colours: number, stickiness: number, s
     keys.length = 0;
     for (const b of blocks) {
       marked[b] = 0;
-      const bx = b % BW;
-      const by = (b / BW) | 0;
-      const iEnd = Math.min(W - 1, (bx + 1) * sub);
-      const jEnd = Math.min(H - 1, (by + 1) * sub);
-      for (let j = by * sub; j <= jEnd; j++) F.fill(0, j * W + bx * sub, j * W + iEnd + 1);
+      const { i0, i1, j0, j1 } = range(b);
+      for (let j = j0; j <= j1; j++) F.fill(0, j * W + i0, j * W + i1 + 1);
     }
     blocks.length = 0;
   }

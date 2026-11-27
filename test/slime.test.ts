@@ -32,7 +32,7 @@ describe('traceSlime', () => {
   it('draws a lone cell as a circle of the usual radius', () => {
     const [s] = trace(['...', '.0.', '...']);
     expect(s!.loops).toHaveLength(1);
-    for (const [x, y] of s!.loops[0]!) expect(Math.hypot(x - 1.5 * CELL, y - 1.5 * CELL)).toBeCloseTo(RADIUS * CELL, -0.5);
+    for (const [x, y] of s!.loops[0]!) expect(Math.abs(Math.hypot(x - 1.5 * CELL, y - 1.5 * CELL) - RADIUS * CELL)).toBeLessThan(0.05 * CELL);
   });
 
   it('joins side-by-side cells into one blob, at any stickiness', () => {
@@ -78,8 +78,28 @@ describe('traceSlime', () => {
     expect(minX(true)).toBeLessThan(-0.5 * CELL);
   });
 
-  it('gives the same result when called again (scratch is cleaned up)', () => {
+  it('gives the same result when called again, even after a bigger board (scratch is cleaned up)', () => {
     const board = ['.....', '.00..', '.0.0.', '.....'];
-    expect(trace(board)[0]!.loops).toEqual(trace(board)[0]!.loops);
+    const first = trace(board)[0]!.loops;
+    trace(Array.from({ length: 12 }, () => '0.00.0.00.00'), { wrap: true });
+    expect(trace(board)[0]!.loops).toEqual(first);
+  });
+
+  it('keeps outlines closed whatever stickiness it is given', () => {
+    for (const stickiness of [-50, 500]) {
+      for (const loop of trace(['.....', '.00..', '..0..', '.....'], { stickiness })[0]!.loops) {
+        loop.forEach(([x, y], k) => {
+          const [px, py] = loop[k - 1] ?? loop.at(-1)!;
+          expect(Math.hypot(x - px, y - py)).toBeLessThan(0.5 * CELL);
+        });
+      }
+    }
+  });
+
+  it('wraps both ways on a board so small a cell is near both edges', () => {
+    // One row: the cell is near the top and bottom edges at once, so it gets a copy above and
+    // below, and the outline is symmetric about its row.
+    const ys = trace(['0..'], { wrap: true })[0]!.loops.flat().map(([, y]) => y);
+    expect(Math.min(...ys) + Math.max(...ys)).toBeCloseTo(CELL, 0);
   });
 });
