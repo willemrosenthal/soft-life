@@ -9,9 +9,15 @@ import { BRUSH_MAX, BRUSH_MIN, brushCells, brushCentre, strokePoints, type Point
 import { ABUNDANCE_MAX, ABUNDANCE_MIN } from './critters';
 import { Drawer, DrawerStack } from './drawers';
 import { Life, parseRule, type Rule } from './life';
-import { PALETTES, type Palette, type PaletteId } from './palettes';
+import 'vanilla-colorful/hex-color-picker.js';
+import { PALETTES, type Palette } from './palettes';
+import {
+  CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, hardToSee, isDark, isHex, loadThemes, nextThemeName, resolvePalette, saveThemes, standOut, themeKey,
+  type CustomTheme,
+} from './themes';
 import { PATTERNS, type PatternCategory } from './patterns';
 import { BoardRenderer, drawCells, type View } from './render';
+import { MiniBoard } from './miniboard';
 import {
   NAME_MAX, PRESETS, TREND_LABELS, TrendWatcher, formatRule, loadRules, mutateRule, nextRuleName, pickSurprise, ruleName,
   saveRules, seededRandom, type SavedRule, type Trend,
@@ -37,6 +43,8 @@ const settings: Settings = loadSettings();
 let rule: Rule = parseRule(settings.rule)!;
 /** The player's own rules, made in the Rule lab. */
 let savedRules: SavedRule[] = loadRules();
+/** The player's own themes, made in the theme editor. */
+let customThemes: CustomTheme[] = loadThemes();
 /** Drawing colour: a colony index (0-based) or the eraser. */
 let brush: number | 'erase' = 0;
 let running = true;
@@ -53,7 +61,9 @@ let lastStep = 0;
 let lastT = 1;
 let dirty = true;
 
-const palette = (): Palette => PALETTES[settings.palette];
+/** The theme in use; applyTheme updates it. */
+let activePalette: Palette = resolvePalette(settings.palette, customThemes);
+const palette = (): Palette => activePalette;
 const save = () => saveSettings(settings);
 
 // ---------------------------------------------------------------------------------------------
@@ -111,6 +121,17 @@ function tween(now: number, last: number, interval: number): number {
   return Math.min(1, (now - last) / Math.min(260, interval * 0.85));
 }
 
+/** Small live boards (the lab preview, the theme editor's), redrawn whenever the look changes. */
+const miniBoards: MiniBoard[] = [];
+function miniBoard(canvas: HTMLCanvasElement, cols: number, rows: number): MiniBoard {
+  const b = new MiniBoard(canvas, cols, rows, tween);
+  miniBoards.push(b);
+  return b;
+}
+function redrawMiniBoards(): void {
+  for (const b of miniBoards) b.invalidate();
+}
+
 function frame(now: number): void {
   const interval = 1000 / settings.speed;
   if (running && now - lastStep >= interval) {
@@ -127,6 +148,7 @@ function frame(now: number): void {
   }
   lastT = t;
   if (labDrawer.amount > 0) runPreview(now);
+  if (themeDrawer.amount > 0) runThemePreview(now);
   activeDemo?.tick(now);
   requestAnimationFrame(frame);
 }
@@ -268,7 +290,7 @@ function panelToggled(panel: HTMLElement, opener: HTMLElement, open: boolean): v
     closePops();
     el<HTMLElement>('[data-close]', panel).focus({ preventScroll: true });
     if (panel === libPanel) drawThumbnails();
-    if (panel === labPanel) fitPreview();
+    if (panel === labPanel) labBoard.fit();
   } else if (panel.contains(document.activeElement)) {
     opener.focus({ preventScroll: true });
   }
@@ -291,11 +313,19 @@ const labDrawer = stack.add('lab', new Drawer(labPanel, true, (open) => {
   if (!open) showLabInfo(false);
   panelToggled(labPanel, setButton, open);
 }));
+// The theme editor opens from Settings too.
+const themePanel = el('#themePanel');
+const themeDrawer = stack.add('theme', new Drawer(themePanel, true, (open) => {
+  if (!open) closeColourSheet(false);
+  panelToggled(themePanel, setButton, open);
+  if (open) themeBoard.fit();
+  else clearEditorColours();
+}));
 
 railTab.addEventListener('click', () => rail.setOpen(true));
 libButton.addEventListener('click', () => stack.openModal(libDrawer));
 setButton.addEventListener('click', () => stack.openModal(setDrawer));
-for (const [panel, drawer] of [[libPanel, libDrawer], [setPanel, setDrawer], [labPanel, labDrawer]] as const) {
+for (const [panel, drawer] of [[libPanel, libDrawer], [setPanel, setDrawer], [labPanel, labDrawer], [themePanel, themeDrawer]] as const) {
   panel.addEventListener('click', (e) => {
     if ((e.target as Element).closest('[data-close]')) drawer.setOpen(false);
   });
@@ -447,7 +477,7 @@ bindRange('stickiness', 'stickiness', STICKINESS_MIN, STICKINESS_MAX, () => {
 // Only the boards melt colours; the thumbnails stay plain goo.
 const redrawBoards = () => {
   syncGoo();
-  labDirty = true;
+  redrawMiniBoards();
   dirty = true;
 };
 bindRange('melt', 'melt', MELT_MIN, MELT_MAX, redrawBoards);
@@ -608,15 +638,29 @@ chips.addEventListener('click', (e) => {
 
 const themesBox = el('#themes');
 
+const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+const ICON_ADD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+/** The theme cards: built-in, then the player's own (each with an edit button), then New. */
 function buildThemes(): void {
-  themesBox.innerHTML = (Object.entries(PALETTES) as [PaletteId, Palette][])
-    .map(([id, p]) => `<button type="button" class="theme" data-theme="${id}" aria-pressed="${settings.palette === id}" style="--tb:${p.bg};--tf:${p.fg}"><span class="dots">${p.cells.slice(0, 4).map((c) => `<i style="--c:${c}"></i>`).join('')}</span>${p.name}</button>`)
-    .join('');
+  const card = (key: string, p: Palette) =>
+    `<button type="button" class="theme" data-theme="${key}" aria-pressed="${settings.palette === key}" style="--tb:${p.bg};--tf:${p.fg}">`
+    + `<span class="dots">${p.cells.slice(0, 4).map((c) => `<i style="--c:${c}"></i>`).join('')}</span><span class="theme-name">${escapeHtml(p.name)}</span></button>`;
+  themesBox.innerHTML = Object.entries(PALETTES).map(([id, p]) => card(id, p)).join('')
+    + customThemes.map((t) => {
+      const p = derivePalette(t);
+      return `<div class="theme-wrap" style="--tf:${p.fg}">${card(themeKey(t), p)}<button type="button" class="theme-edit" data-edit-theme="${t.id}" aria-label="Edit ${escapeHtml(t.name)}">${ICON_EDIT}</button></div>`;
+    }).join('')
+    + `<button type="button" class="theme theme-new" data-new-theme>${ICON_ADD}New</button>`;
 }
 themesBox.addEventListener('click', (e) => {
-  const b = (e.target as Element).closest<HTMLElement>('[data-theme]');
+  const t = e.target as Element;
+  const edit = t.closest<HTMLElement>('[data-edit-theme]');
+  if (edit) return openThemeEditor(customThemes.find((x) => x.id === edit.dataset.editTheme) ?? null);
+  if (t.closest('[data-new-theme]')) return openThemeEditor(null);
+  const b = t.closest<HTMLElement>('[data-theme]');
   if (!b) return;
-  settings.palette = b.dataset.theme as PaletteId;
+  settings.palette = b.dataset.theme!;
   save();
   applyTheme();
 });
@@ -626,7 +670,7 @@ function restyle(): void {
   drawThumbnails();
   drawRuleThumbnails();
   drawBrushPreview();
-  labDirty = true;
+  redrawMiniBoards();
   dirty = true;
 }
 
@@ -699,7 +743,13 @@ function setBoardRule(code: string): void {
 }
 
 function applyTheme(): void {
-  const p = palette();
+  const p = resolvePalette(settings.palette, customThemes);
+  // A custom theme that's been deleted: back to Meadow, and remember that.
+  if (p === PALETTES.meadow && settings.palette !== 'meadow') {
+    settings.palette = 'meadow';
+    save();
+  }
+  activePalette = p;
   const root = document.documentElement.style;
   root.setProperty('--app-bg', p.bg);
   root.setProperty('--app-fg', p.fg);
@@ -714,7 +764,7 @@ function applyTheme(): void {
   drawRuleThumbnails();
   drawBrushPreview();
   updateRing();
-  labDirty = true;
+  redrawMiniBoards();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -729,40 +779,17 @@ const THUMB_ROWS = 18;
 const THUMB_GENS = 40;
 
 const labCanvas = el<HTMLCanvasElement>('#labCv');
-const labCtx = labCanvas.getContext('2d')!;
 const labTrendEl = el('#labTrend');
 const labGenEl = el('#labGen');
 const labLine = el('#labLine');
 const labName = el<HTMLInputElement>('#labName');
 const labSaveBtn = el('#labSaveBtn');
 const labCards = el('#labCards');
-const preview = new Life(PREVIEW_COLS, PREVIEW_ROWS);
-const previewRenderer = new BoardRenderer();
-const previewView: View = { width: 0, height: 0, cell: 0, ox: 0, oy: 0 };
+const labBoard = miniBoard(labCanvas, PREVIEW_COLS, PREVIEW_ROWS);
 const trendWatcher = new TrendWatcher();
 let labRule: Rule = rule;
 /** The saved rule being edited, if any: Save updates it instead of adding a new one. */
 let labEditing: string | null = null;
-let labLastStep = 0;
-let labLastT = 1;
-let labDirty = true;
-
-function fitPreview(): void {
-  const dpr = Math.min(devicePixelRatio || 1, 3);
-  const w = labCanvas.clientWidth;
-  const h = labCanvas.clientHeight;
-  if (!w || !h) return;
-  labCanvas.width = Math.round(w * dpr);
-  labCanvas.height = Math.round(h * dpr);
-  labCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  previewView.width = w;
-  previewView.height = h;
-  previewView.cell = Math.min(w / PREVIEW_COLS, h / PREVIEW_ROWS);
-  previewView.ox = (w - PREVIEW_COLS * previewView.cell) / 2;
-  previewView.oy = (h - PREVIEW_ROWS * previewView.cell) / 2;
-  labDirty = true;
-}
-new ResizeObserver(fitPreview).observe(labCanvas);
 
 function showTrend(trend: Trend): void {
   labTrendEl.dataset.trend = trend;
@@ -770,29 +797,18 @@ function showTrend(trend: Trend): void {
 }
 
 function restartPreview(): void {
-  preview.soup();
+  labBoard.restart();
   trendWatcher.reset();
   showTrend('starting');
   labGenEl.textContent = 'Gen 0';
-  labLastStep = performance.now();
-  labDirty = true;
 }
 
-/** Called from the main loop while the lab is showing. */
+/** Called from the main loop while the lab is showing. It always wraps, so every rule gets the same fair test. */
 function runPreview(now: number): void {
-  const interval = 1000 / settings.labSpeed;
-  if (now - labLastStep >= interval) {
-    preview.step(labRule, true);
-    labLastStep = now;
-    showTrend(trendWatcher.update(preview.cur));
-    labGenEl.textContent = `Gen ${preview.gen}`;
+  if (labBoard.run(now, labRule, settings.labSpeed, palette(), { ...settings, critters: false, wrap: true })) {
+    showTrend(trendWatcher.update(labBoard.life.cur));
+    labGenEl.textContent = `Gen ${labBoard.life.gen}`;
   }
-  const t = tween(now, labLastStep, interval);
-  if (t < 1 || labLastT < 1 || labDirty) {
-    previewRenderer.draw(labCtx, preview, previewView, palette(), { ...settings, critters: false, wrap: true }, t, now);
-    labDirty = false;
-  }
-  labLastT = t;
 }
 
 // The neighbour-count buttons: born with 1–8 (0 would make the board flash), survive with 0–8.
@@ -983,6 +999,186 @@ function drawRuleThumbnails(): void {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Theme editor: pick seven colours (the background and one per colony); themes.ts works out the rest.
+
+const THEME_PREVIEW_COLS = 24;
+const THEME_PREVIEW_ROWS = 18;
+const THEME_PREVIEW_SPEED = 6;
+/** Swatch -1 is the background; 0–5 are the colony colours. */
+const BG = -1;
+
+const themeSwatches = el('#themeSwatches');
+const themeNote = el('#themeNote');
+const themeName = el<HTMLInputElement>('#themeName');
+themeName.maxLength = THEME_NAME_MAX;
+const themeDelete = el('#themeDelete');
+const colourSheet = el('#colourSheet');
+const colourStrip = el('#colourStrip');
+const colourPicker = el<HTMLElementTagNameMap['hex-color-picker']>('#colourPicker');
+const colourHex = el<HTMLInputElement>('#colourHex');
+const colourFix = el('#colourFix');
+const colourNote = el('#colourNote');
+const themeBoard = miniBoard(el<HTMLCanvasElement>('#themeCv'), THEME_PREVIEW_COLS, THEME_PREVIEW_ROWS);
+/** The theme being edited; `editingTheme` is its id once saved, so Save updates instead of adding. */
+let draft: CustomTheme = { id: '', name: '', bg: PALETTES.meadow.bg, cells: [...PALETTES.meadow.cells] };
+let draftPalette: Palette = derivePalette(draft);
+let editingTheme: string | null = null;
+let colourTarget = BG;
+const EDITOR_VARS = ['bg', 'fg', 'panel', 'line', 'muted', 'accent'] as const;
+
+const colourOf = (i: number) => (i === BG ? draft.bg : draft.cells[i]!);
+const colourName = (i: number) => (i === BG ? 'Background' : `Colour ${i + 1}`);
+
+function openThemeEditor(theme: CustomTheme | null): void {
+  const p = palette();
+  editingTheme = theme?.id ?? null;
+  // A new theme starts from the colours in use.
+  draft = theme ? { ...theme, cells: [...theme.cells] } : { id: '', name: '', bg: p.bg.slice(0, 7).toUpperCase(), cells: p.cells.slice(0, CELL_COUNT).map((c) => c.toUpperCase()) };
+  el('#themeTitle').textContent = theme ? 'Edit theme' : 'New theme';
+  themeName.value = theme?.name ?? '';
+  themeName.placeholder = theme?.name ?? nextThemeName(customThemes);
+  themeDelete.hidden = !theme;
+  closeColourSheet(false);
+  renderEditor();
+  themeBoard.restart();
+  stack.openModal(themeDrawer);
+}
+
+/** The editor wears the theme being made, so its buttons and panels show it too. */
+function paintEditor(p: Palette): void {
+  for (const k of EDITOR_VARS) themePanel.style.setProperty(`--app-${k}`, p[k]);
+}
+function clearEditorColours(): void {
+  for (const k of EDITOR_VARS) themePanel.style.removeProperty(`--app-${k}`);
+}
+
+/** The seven swatches. `strip` is the small row in the colour sheet: no captions. */
+function swatchRow(strip: boolean): string {
+  const sheetOpen = !colourSheet.hidden;
+  return [BG, ...draft.cells.keys()].map((i) => {
+    const hex = colourOf(i);
+    const weak = i !== BG && hardToSee(hex, draft.bg);
+    return `<div class="tsw-col"><button type="button" class="tsw${i === BG ? ' tsw-bg' : ''}" data-colour="${i}" aria-pressed="${sheetOpen && colourTarget === i}" style="--c:${hex}" aria-label="${colourName(i)} ${hex}${weak ? ', hard to see' : ''}">`
+      + `${weak ? '<span class="tsw-warn" aria-hidden="true">!</span>' : ''}</button>${strip ? '' : `<small>${i === BG ? 'Background' : i + 1}</small>`}</div>`;
+  }).join('');
+}
+
+/** Everything that shows the draft. `fromPicker` leaves the picker alone while it's being dragged. */
+function renderEditor(fromPicker = false): void {
+  draftPalette = derivePalette(draft);
+  paintEditor(draftPalette);
+  themeBoard.invalidate();
+  themeSwatches.innerHTML = swatchRow(false);
+  const weak = draft.cells.filter((c) => hardToSee(c, draft.bg)).length;
+  themeNote.className = weak ? 'theme-note warn' : 'theme-note';
+  themeNote.textContent = weak
+    ? `${weak} colour${weak > 1 ? 's are' : ' is'} hard to see on the background. Tap ${weak > 1 ? 'one' : 'it'} to fix.`
+    : 'Text, panels and the rest are worked out from these seven.';
+  if (colourSheet.hidden) return;
+  const hex = colourOf(colourTarget);
+  colourStrip.innerHTML = swatchRow(true);
+  el('#colourTitle').textContent = colourName(colourTarget);
+  if (!fromPicker) colourPicker.color = hex;
+  if (document.activeElement !== colourHex) colourHex.value = hex;
+  const cellWeak = colourTarget !== BG && hardToSee(hex, draft.bg);
+  colourFix.hidden = !cellWeak;
+  colourNote.className = cellWeak ? 'theme-note warn' : 'theme-note';
+  colourNote.textContent = cellWeak ? 'Hard to see on this background. Fix contrast changes its lightness and keeps the hue.'
+    : colourTarget !== BG ? 'Shows up well on your background.'
+      : isDark(hex) ? 'A dark background: text and panels turn light to match.' : 'A light background: text and panels stay dark.';
+}
+
+function setColour(hex: string, fromPicker = false): void {
+  hex = hex.toUpperCase();
+  if (hex === colourOf(colourTarget)) return;
+  if (colourTarget === BG) draft.bg = hex;
+  else draft.cells[colourTarget] = hex;
+  renderEditor(fromPicker);
+}
+
+// The colour sheet covers only the lower part, so the preview stays in view. The rest of the editor
+// is inert behind it, so Tab stays in the sheet.
+const editorMain = [el('.panel-head', themePanel), el('.panel-body', themePanel)];
+function openColourSheet(i: number): void {
+  colourTarget = i;
+  colourSheet.hidden = false;
+  for (const part of editorMain) part.inert = true;
+  renderEditor();
+  el<HTMLElement>('#colourDone').focus({ preventScroll: true });
+}
+function closeColourSheet(restoreFocus = true): void {
+  if (colourSheet.hidden) return;
+  colourSheet.hidden = true;
+  for (const part of editorMain) part.inert = false;
+  renderEditor();
+  if (restoreFocus) el<HTMLElement>(`[data-colour="${colourTarget}"]`, themeSwatches).focus({ preventScroll: true });
+}
+
+themePanel.addEventListener('click', (e) => {
+  const sw = (e.target as Element).closest<HTMLElement>('[data-colour]');
+  if (!sw) return;
+  const i = Number(sw.dataset.colour);
+  if (colourSheet.hidden) openColourSheet(i);
+  else {
+    colourTarget = i;
+    renderEditor();
+  }
+});
+el('#colourDone').addEventListener('click', () => closeColourSheet());
+colourPicker.addEventListener('color-changed', (e) => setColour((e as CustomEvent<{ value: string }>).detail.value, true));
+colourHex.addEventListener('input', () => {
+  const v = colourHex.value.trim();
+  const hex = v.startsWith('#') ? v : `#${v}`;
+  if (isHex(hex)) setColour(hex);
+});
+colourHex.addEventListener('blur', () => { colourHex.value = colourOf(colourTarget); });
+colourFix.addEventListener('click', () => setColour(standOut(colourOf(colourTarget), draft.bg)));
+el('#themeBack').addEventListener('click', () => stack.openModal(setDrawer));
+
+/** Called from the main loop while the editor is showing: a soup in the draft's colours, reseeded when it dies. */
+function runThemePreview(now: number): void {
+  if (themeBoard.run(now, rule, THEME_PREVIEW_SPEED, draftPalette, { ...settings, mode: 'colonies', wrap: true }) && !themeBoard.life.population()) {
+    themeBoard.restart();
+  }
+}
+
+el('#themeSave').addEventListener('click', () => {
+  const name = (themeName.value.trim() || themeName.placeholder).slice(0, THEME_NAME_MAX);
+  const existing = customThemes.find((t) => t.id === editingTheme);
+  const theme: CustomTheme = { id: existing?.id ?? Date.now().toString(36), name, bg: draft.bg, cells: [...draft.cells] };
+  if (existing) customThemes[customThemes.indexOf(existing)] = theme;
+  else customThemes.push(theme);
+  saveThemes(customThemes);
+  settings.palette = themeKey(theme);
+  save();
+  applyTheme();
+  stack.openModal(setDrawer);
+  toast(`Saved ${name}`);
+});
+
+themeDelete.addEventListener('click', () => {
+  const at = customThemes.findIndex((t) => t.id === editingTheme);
+  if (at < 0) return;
+  const [gone] = customThemes.splice(at, 1);
+  const wasInUse = settings.palette === themeKey(gone!);
+  saveThemes(customThemes);
+  applyTheme(); // a deleted theme in use falls back to Meadow
+  stack.openModal(setDrawer);
+  toast(`Deleted ${gone!.name}`, {
+    label: 'Undo',
+    run: () => {
+      customThemes.splice(Math.min(at, customThemes.length), 0, gone!);
+      saveThemes(customThemes);
+      if (wasInUse) {
+        settings.palette = themeKey(gone!);
+        save();
+      }
+      applyTheme();
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
 // Sharing
 
 async function share(): Promise<void> {
@@ -1030,6 +1226,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (activeDemo) closeDemo();
     else if (pops.some((p) => !p.hidden)) closePops(true);
+    else if (!colourSheet.hidden) closeColourSheet();
     else if (!labInfo.hidden) showLabInfo(false);
     else stack.topModal()?.setOpen(false);
     return;

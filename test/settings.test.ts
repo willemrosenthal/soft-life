@@ -7,6 +7,10 @@ describe('parseSettings', () => {
     expect(parseSettings(JSON.parse(JSON.stringify(saved)))).toEqual(saved);
   });
 
+  it('keeps a custom theme, even one that has since been deleted (the app falls back to Meadow then)', () => {
+    expect(parseSettings({ ...DEFAULT_SETTINGS, palette: 'custom:abc' }).palette).toBe('custom:abc');
+  });
+
   it('falls back to defaults for anything missing, unknown or out of range', () => {
     expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(parseSettings({ palette: 'toString', style: 'blobs', rule: 'B9/S1', speed: 99, labSpeed: 0.25, wrap: 'yes', density: 8, stickiness: 101, melt: -1, gaps: 'wide', brushSize: 2.5, critterAbundance: 101 })).toEqual(DEFAULT_SETTINGS);

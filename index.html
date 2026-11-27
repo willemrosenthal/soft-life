@@ -259,6 +259,39 @@
     </section>
   </aside>
 
+  <!-- Theme editor: seven colours make a theme (themes.ts). It recolours itself as you edit. -->
+  <aside class="panel" id="themePanel" role="dialog" aria-modal="true" aria-labelledby="themeTitle">
+    <div class="panel-head">
+      <button type="button" class="ib ib-sm" id="themeBack" aria-label="Back to settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h2 id="themeTitle">New theme</h2>
+      <button type="button" class="ib ib-sm" data-close aria-label="Close theme editor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <div class="preview"><canvas id="themeCv" aria-label="Preview of the theme"></canvas></div>
+      <div class="group"><h3>Your colours<small>Tap one to change it</small></h3><div class="tswatches" id="themeSwatches"></div></div>
+      <p class="theme-note" id="themeNote"></p>
+      <div class="group"><h3><label for="themeName">Name</label></h3><input class="field" id="themeName" type="text" autocomplete="off"></div>
+      <button type="button" class="pill pill-wide" id="themeSave">Save and use</button>
+      <button type="button" class="ghost danger" id="themeDelete" hidden>Delete this theme</button>
+    </div>
+    <!-- Only the colour: rises over the lower part, so the preview stays in view. -->
+    <section class="colour-sheet" id="colourSheet" role="dialog" aria-labelledby="colourTitle" hidden>
+      <div class="demo-grabber" aria-hidden="true"></div>
+      <div class="colour-head"><h3 id="colourTitle">Background</h3><button type="button" class="pill" id="colourDone">Done</button></div>
+      <div class="tswatches strip" id="colourStrip"></div>
+      <hex-color-picker id="colourPicker"></hex-color-picker>
+      <div class="hexrow">
+        <input class="field hex" id="colourHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour">
+        <button type="button" class="ghost" id="colourFix" hidden>Fix contrast</button>
+      </div>
+      <p class="theme-note" id="colourNote"></p>
+    </section>
+  </aside>
+
   <!-- Demo sheet: the animated scene behind an (i) button (demos.ts). -->
   <div class="demo-scrim" id="demoScrim" hidden></div>
   <section class="demo-sheet" id="demoSheet" role="dialog" aria-modal="true" aria-labelledby="demoTitle" hidden>

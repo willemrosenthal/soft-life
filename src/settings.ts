@@ -1,14 +1,15 @@
 import { BRUSH_MAX, BRUSH_MIN } from './brush';
 import { ABUNDANCE_MAX, ABUNDANCE_MIN, DEFAULT_ABUNDANCE } from './critters';
 import { parseRule } from './life';
-import { isPaletteId, type PaletteId } from './palettes';
 import type { CellStyle, ColourMode } from './render';
+import { isThemeKey } from './themes';
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 
 /** Everything remembered between visits. The board itself isn't saved; share a link for that. */
 export interface Settings {
-  palette: PaletteId;
+  /** A built-in theme's id, or "custom:<id>" for one the player made (see themes.ts). */
+  palette: string;
   style: CellStyle;
   mode: ColourMode;
   rule: string;
@@ -69,7 +70,7 @@ export function parseSettings(value: unknown): Settings {
   const oneOf = <T extends string>(x: unknown, options: readonly T[], fallback: T) => (options.includes(x as T) ? (x as T) : fallback);
   const int = (x: unknown, min: number, max: number, fallback: number) => (typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : fallback);
   return {
-    palette: isPaletteId(v.palette) ? v.palette : d.palette,
+    palette: isThemeKey(v.palette) ? v.palette : d.palette,
     style: oneOf(v.style, STYLES, d.style),
     mode: oneOf(v.mode, MODES, d.mode),
     rule: typeof v.rule === 'string' && parseRule(v.rule) ? v.rule : d.rule,
