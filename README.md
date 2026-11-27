@@ -5,7 +5,7 @@ Conway's Game of Life with cells that merge into soft blobs. An installable web 
 - **Play:** tap or drag on the board to draw in the chosen colour; starting a stroke on a live cell erases instead. Random soup, step, play/pause, clear, share, and a speed slider (1–30 generations a second).
 - **Bigger board:** the handle at the top of the controls folds the colours, controls and speed away so the board fills the screen; the round button in the board's corner brings them back. The choice is remembered.
 - **Patterns:** a library of classic spaceships, oscillators and methuselahs. Tap one to drop it onto the board.
-- **Settings:** three themes, cell style (goo, dots, pixels), colour mode (colonies, solo, age), rule (Conway, HighLife, Day & Night, Seeds), smooth transitions, critters, and wrapping edges. Saved in the browser.
+- **Settings:** three themes, cell style (goo, dots, pixels), colour mode (colonies, solo, age), rule (Conway, HighLife, Day & Night, Seeds), smooth transitions, critters (long-lived cells open eyes that look around, blink, follow your pointer and doze off), and wrapping edges. Saved in the browser.
 - **Share:** puts the pattern (and rule) in the link; opening the link loads it.
 - **Keyboard:** Space plays and pauses, H hides or shows the controls.
 
@@ -26,7 +26,8 @@ npm run preview    # serve dist/ to try the built app (offline mode only works i
 ```
 src/
   life.ts       the simulation: rules, colonies, ages, resizing, placing patterns (no drawing)
-  render.ts     the goo drawing: circles, curved necks between neighbours, critters
+  render.ts     the goo drawing: circles, curved necks between neighbours
+  critters.ts   the eyes on long-lived cells: where they go, how they move, blink and react
   share.ts      pattern ⇄ link (#p=…&r=…), run-length encoded
   settings.ts   saved settings, checked on load
   palettes.ts   themes

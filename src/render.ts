@@ -1,3 +1,4 @@
+import { Critters } from './critters';
 import type { Life } from './life';
 import type { Palette } from './palettes';
 
@@ -120,9 +121,14 @@ const shrink = (t: number) => 1 - t * t * (3 - 2 * t);
 export class BoardRenderer {
   private size = new Float32Array(0);
   private colour = new Int8Array(0);
+  /** Eyes on long-lived cells. Set its `pointer` and `calm`, and `poke` it on taps. */
+  readonly critters = new Critters();
 
-  /** `t` runs 0 → 1 between generations: how far cells have grown in or melted away. */
-  draw(ctx: CanvasRenderingContext2D, life: Life, view: View, pal: Palette, look: Look, t: number): void {
+  /**
+   * `t` runs 0 → 1 between generations: how far cells have grown in or melted away. `now` is the
+   * frame's wall-clock time in ms, which drives the critters' eyes.
+   */
+  draw(ctx: CanvasRenderingContext2D, life: Life, view: View, pal: Palette, look: Look, t: number, now: number): void {
     const { cols, rows, cur, prev, ages, prevAges } = life;
     const n = cols * rows;
     if (this.size.length !== n) {
@@ -162,37 +168,18 @@ export class BoardRenderer {
     const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
     drawCells(ctx, { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style });
 
-    if (look.critters) this.drawCritters(ctx, life, view, pal);
+    if (look.critters) {
+      this.critters.draw(ctx, {
+        life, place: view, t, now, iris: pal.iris, ink: pal.fg, pairs: look.style === 'goo',
+        skinOf: (i) => colours[colour[i]!]!,
+      });
+    } else if (this.critters.active) {
+      this.critters.reset();
+    }
   }
 
-  /** Some long-lived cells open an eye. Which ones is fixed by position, so eyes don't flicker. */
-  private drawCritters(ctx: CanvasRenderingContext2D, life: Life, view: View, pal: Palette): void {
-    const { cols, rows, cur, prev, ages } = life;
-    const { cell: c, ox, oy } = view;
-    const ring = new Path2D();
-    const white = new Path2D();
-    const pupil = new Path2D();
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const i = y * cols + x;
-        if (!(cur[i] && prev[i] && ages[i]! >= 18 && (x * 7 + y * 13) % 9 === 0)) continue;
-        const cx = ox + (x + 0.5) * c;
-        const cy = oy + (y + 0.5) * c;
-        ring.moveTo(cx + c * 0.27, cy);
-        ring.arc(cx, cy, c * 0.27, 0, TAU);
-        white.moveTo(cx + c * 0.2, cy);
-        white.arc(cx, cy, c * 0.2, 0, TAU);
-        const px = cx + c * 0.04;
-        const py = cy - c * 0.03;
-        pupil.moveTo(px + c * 0.09, py);
-        pupil.arc(px, py, c * 0.09, 0, TAU);
-      }
-    }
-    ctx.fillStyle = pal.ring;
-    ctx.fill(ring);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill(white);
-    ctx.fillStyle = '#161616';
-    ctx.fill(pupil);
+  /** True while critters are on screen: their eyes move on their own, so keep drawing every frame. */
+  get animating(): boolean {
+    return this.critters.active;
   }
 }

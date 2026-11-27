@@ -98,8 +98,10 @@ function frame(now: number): void {
     updateStats();
   }
   const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - lastStep) / Math.min(260, interval * 0.85));
-  if (t < 1 || lastT < 1 || dirty) {
-    renderer.draw(ctx, life, view, palette(), settings, t);
+  renderer.critters.calm = reducedMotion.matches;
+  // Critters' eyes move on their own, so while any are showing the board redraws every frame.
+  if (t < 1 || lastT < 1 || dirty || (settings.critters && renderer.animating)) {
+    renderer.draw(ctx, life, view, palette(), settings, t, now);
     dirty = false;
   }
   lastT = t;
@@ -126,10 +128,16 @@ function boardChanged(): void {
 let painting = false;
 let paintColony = 0;
 
-function cellAt(e: PointerEvent): number {
+/** The pointer's position in grid units: cell (0, 0) spans 0..1. */
+function gridPoint(e: PointerEvent): { x: number; y: number } {
   const r = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - r.left - view.ox) / view.cell);
-  const y = Math.floor((e.clientY - r.top - view.oy) / view.cell);
+  return { x: (e.clientX - r.left - view.ox) / view.cell, y: (e.clientY - r.top - view.oy) / view.cell };
+}
+
+function cellAt(e: PointerEvent): number {
+  const p = gridPoint(e);
+  const x = Math.floor(p.x);
+  const y = Math.floor(p.y);
   return x < 0 || y < 0 || x >= life.cols || y >= life.rows ? -1 : y * life.cols + x;
 }
 
@@ -148,9 +156,22 @@ canvas.addEventListener('pointerdown', (e) => {
   paintColony = brush === 'erase' || life.cur[i] ? 0 : brush + 1;
   painting = true;
   paint(i);
+  const p = gridPoint(e);
+  renderer.critters.pointer = p;
+  renderer.critters.poke(p.x, p.y);
 });
-canvas.addEventListener('pointermove', (e) => { if (painting) paint(cellAt(e)); });
-for (const type of ['pointerup', 'pointercancel'] as const) canvas.addEventListener(type, () => { painting = false; });
+canvas.addEventListener('pointermove', (e) => {
+  // Critters watch the pointer (or a finger while it's down).
+  renderer.critters.pointer = gridPoint(e);
+  if (painting) paint(cellAt(e));
+});
+for (const type of ['pointerup', 'pointercancel'] as const) {
+  canvas.addEventListener(type, (e) => {
+    painting = false;
+    if (e.pointerType !== 'mouse') renderer.critters.pointer = null;
+  });
+}
+canvas.addEventListener('pointerleave', () => { renderer.critters.pointer = null; });
 
 // ---------------------------------------------------------------------------------------------
 // Controls
