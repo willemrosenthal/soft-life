@@ -14,7 +14,7 @@ export interface Settings {
   wrap: boolean;
   critters: boolean;
   smooth: boolean;
-  /** Generations per second. */
+  /** Generations per second: one of SPEED_STEPS. */
   speed: number;
   /** Dots across the screen. */
   density: number;
@@ -32,6 +32,13 @@ export interface Settings {
 
 export const SPEED_MIN = 1;
 export const SPEED_MAX = 30;
+/** Speeds below one a second, slowest first: a step every 3s, 2s and 1.5s. */
+export const SLOW_SPEEDS: readonly number[] = [1 / 3, 1 / 2, 2 / 3];
+/** Every speed the slider offers, slowest first; the slider's value is an index into this. */
+export const SPEED_STEPS: readonly number[] = [
+  ...SLOW_SPEEDS,
+  ...Array.from({ length: SPEED_MAX - SPEED_MIN + 1 }, (_, i) => SPEED_MIN + i),
+];
 export const DENSITY_MIN = 12;
 export const DENSITY_MAX = 48;
 
@@ -60,7 +67,7 @@ export function parseSettings(value: unknown): Settings {
     wrap: flag(v.wrap, d.wrap),
     critters: flag(v.critters, d.critters),
     smooth: flag(v.smooth, d.smooth),
-    speed: int(v.speed, SPEED_MIN, SPEED_MAX, d.speed),
+    speed: SPEED_STEPS.includes(v.speed as number) ? (v.speed as number) : d.speed,
     density: int(v.density, DENSITY_MIN, DENSITY_MAX, d.density),
     stickiness: int(v.stickiness, STICKINESS_MIN, STICKINESS_MAX, d.stickiness),
     melt: int(v.melt, MELT_MIN, MELT_MAX, d.melt),

@@ -15,7 +15,7 @@ import {
   NAME_MAX, PRESETS, TREND_LABELS, TrendWatcher, formatRule, loadRules, mutateRule, nextRuleName, pickSurprise, ruleName,
   saveRules, seededRandom, type SavedRule, type Trend,
 } from './rules';
-import { DENSITY_MAX, DENSITY_MIN, loadSettings, saveSettings, type Settings } from './settings';
+import { DENSITY_MAX, DENSITY_MIN, loadSettings, saveSettings, SPEED_STEPS, type Settings } from './settings';
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
@@ -361,7 +361,7 @@ el('#btnClear').addEventListener('click', () => {
 el('#btnShare').addEventListener('click', () => void share());
 
 /** A range input bound to a numeric setting, with its readout. */
-function bindRange(id: string, key: 'speed' | 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps', min: number, max: number, onChange: () => void): HTMLInputElement {
+function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps', min: number, max: number, onChange: () => void): HTMLInputElement {
   const input = el<HTMLInputElement>(`#${id}`);
   input.min = String(min);
   input.max = String(max);
@@ -380,7 +380,7 @@ const sizeOut = el('#sizeOut');
 const sizeBadge = el('#sizeBadge');
 
 function syncBoardPop(): void {
-  speedOut.textContent = `${settings.speed}/s`;
+  speedOut.textContent = settings.speed >= 1 ? `${settings.speed}/s` : `every ${+(1 / settings.speed).toFixed(1)}s`;
   densityOut.textContent = `${life.cols} × ${life.rows}`;
 }
 function syncSize(): void {
@@ -390,7 +390,18 @@ function syncSize(): void {
   updateRing();
 }
 
-bindRange('speed', 'speed', 1, 30, syncBoardPop);
+{
+  // The slider walks SPEED_STEPS, so the slow end can offer fractions of a step per second.
+  const input = el<HTMLInputElement>('#speed');
+  input.min = '0';
+  input.max = String(SPEED_STEPS.length - 1);
+  input.value = String(Math.max(0, SPEED_STEPS.indexOf(settings.speed)));
+  input.addEventListener('input', () => {
+    settings.speed = SPEED_STEPS[Number(input.value)] ?? settings.speed;
+    save();
+    syncBoardPop();
+  });
+}
 bindRange('density', 'density', DENSITY_MIN, DENSITY_MAX, () => {
   fitCanvas();
   fitGrid();
