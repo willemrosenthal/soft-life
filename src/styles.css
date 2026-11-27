@@ -386,7 +386,8 @@ svg { display: block; }
   content: "!"; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 6px; vertical-align: 1px;
   border-radius: 50%; background: #E0A100; color: #1A1A1A; font: 700 10px var(--mono);
 }
-.theme-surprise { justify-self: start; }
+.theme-surprise { justify-self: start; display: flex; align-items: center; gap: 6px; }
+.theme-surprise .ib:disabled { cursor: default; opacity: .35; }
 .ghost.danger { justify-self: center; color: #C4473C; box-shadow: none; background: none; }
 .colour-edit {
   display: grid; gap: 10px; padding: 12px; border-radius: 16px; background: var(--app-panel); box-shadow: inset 0 0 0 1px var(--app-line);

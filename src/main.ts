@@ -1131,6 +1131,7 @@ function openThemeEditor(theme: CustomTheme | null): void {
   themeName.value = theme?.name ?? '';
   themeName.placeholder = theme?.name ?? nextThemeName(customThemes);
   themeDelete.hidden = !theme;
+  resetSurpriseHistory();
   pickColour(null);
   restartThemePreview();
   stack.openModal(themeDrawer);
@@ -1220,18 +1221,47 @@ colourHex.addEventListener('blur', () => { if (colourTarget !== null) colourHex.
 colourFix.addEventListener('click', () => { if (colourTarget !== null) setColour(standOut(colourOf(colourTarget), draft.bg)); });
 el('#themeBack').addEventListener('click', () => stack.openModal(setDrawer));
 // Seven new colours that go together. It replaces all of them, so the toast can put them back.
-el('#themeSurprise').addEventListener('click', () => {
-  const before = { bg: draft.bg, cells: [...draft.cells] };
-  Object.assign(draft, surpriseTheme());
+// Each press is remembered (only while the editor is open), so back and forward can return to one you liked.
+type ThemeColours = Pick<CustomTheme, 'bg' | 'cells'>;
+const surpriseHistory: ThemeColours[] = [];
+let surpriseAt = -1;
+const themeHistBack = el<HTMLButtonElement>('#themeHistBack');
+const themeHistFwd = el<HTMLButtonElement>('#themeHistFwd');
+const snapshot = (): ThemeColours => ({ bg: draft.bg, cells: [...draft.cells] });
+
+function updateSurpriseNav(): void {
+  themeHistBack.disabled = surpriseAt <= 0;
+  themeHistFwd.disabled = surpriseAt >= surpriseHistory.length - 1;
+}
+function resetSurpriseHistory(): void {
+  surpriseHistory.length = 0;
+  surpriseAt = -1;
+  updateSurpriseNav();
+}
+/** Move through the history. Hand edits made since are kept in the entry being left. */
+function stepSurprise(by: number): void {
+  const to = surpriseAt + by;
+  if (to < 0 || to >= surpriseHistory.length) return;
+  surpriseHistory[surpriseAt] = snapshot();
+  surpriseAt = to;
+  const { bg, cells } = surpriseHistory[to]!;
+  Object.assign(draft, { bg, cells: [...cells] });
+  updateSurpriseNav();
   renderEditor();
-  toast('New colours', {
-    label: 'Undo',
-    run: () => {
-      Object.assign(draft, before);
-      renderEditor();
-    },
-  });
+}
+
+el('#themeSurprise').addEventListener('click', () => {
+  // A new press after stepping back drops the ones ahead, like a browser's history.
+  if (surpriseAt < 0) surpriseAt = 0;
+  surpriseHistory.splice(surpriseAt, Infinity, snapshot());
+  Object.assign(draft, surpriseTheme());
+  surpriseHistory.push(snapshot());
+  surpriseAt = surpriseHistory.length - 1;
+  updateSurpriseNav();
+  renderEditor();
 });
+themeHistBack.addEventListener('click', () => stepSurprise(-1));
+themeHistFwd.addEventListener('click', () => stepSurprise(1));
 
 function restartThemePreview(): void {
   themeBoard.restart();

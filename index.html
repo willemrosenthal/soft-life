@@ -310,9 +310,18 @@
         </button>
       </div>
       <div class="group"><h3>Your colours<small>Tap one to change it</small></h3><div class="tswatches" id="themeSwatches"></div></div>
-      <button type="button" class="ghost theme-surprise" id="themeSurprise">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/></svg>Surprise me
-      </button>
+      <!-- Back and forward step through the colours Surprise me has given while this editor is open. -->
+      <div class="theme-surprise">
+        <button type="button" class="ib ib-sm" id="themeHistBack" aria-label="Previous surprise colours" title="Previous colours" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <button type="button" class="ghost" id="themeSurprise">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/></svg>Surprise me
+        </button>
+        <button type="button" class="ib ib-sm" id="themeHistFwd" aria-label="Next surprise colours" title="Next colours" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
       <!-- The picker for the colour tapped above, opened in place. -->
       <div class="colour-edit" id="colourEdit" hidden>
         <div class="colour-head">
