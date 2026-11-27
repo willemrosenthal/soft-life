@@ -12,7 +12,7 @@ import { Life, parseRule, type Rule } from './life';
 import 'vanilla-colorful/hex-color-picker.js';
 import { PALETTES, type Palette } from './palettes';
 import {
-  CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, hardToSee, isDark, isHex, loadThemes, nextThemeName, resolvePalette, saveThemes, standOut, themeKey,
+  CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, surpriseTheme, hardToSee, isDark, isHex, loadThemes, nextThemeName, resolvePalette, saveThemes, standOut, themeKey,
   type CustomTheme,
 } from './themes';
 import { PATTERNS, type PatternCategory } from './patterns';
@@ -1200,6 +1200,19 @@ colourHex.addEventListener('input', () => {
 colourHex.addEventListener('blur', () => { if (colourTarget !== null) colourHex.value = colourOf(colourTarget); });
 colourFix.addEventListener('click', () => { if (colourTarget !== null) setColour(standOut(colourOf(colourTarget), draft.bg)); });
 el('#themeBack').addEventListener('click', () => stack.openModal(setDrawer));
+// Seven new colours that go together. It replaces all of them, so the toast can put them back.
+el('#themeSurprise').addEventListener('click', () => {
+  const before = { bg: draft.bg, cells: [...draft.cells] };
+  Object.assign(draft, surpriseTheme());
+  renderEditor();
+  toast('New colours', {
+    label: 'Undo',
+    run: () => {
+      Object.assign(draft, before);
+      renderEditor();
+    },
+  });
+});
 
 function restartThemePreview(): void {
   themeBoard.restart();

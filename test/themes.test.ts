@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { contrast, hexToLch } from '../src/oklab';
+import { contrast, difference, hexToLch } from '../src/oklab';
 import { PALETTES } from '../src/palettes';
-import { derivePalette, hardToSee, isThemeKey, nextThemeName, parseThemes, resolvePalette, standOut, type CustomTheme } from '../src/themes';
+import { derivePalette, hardToSee, isDark, isThemeKey, nextThemeName, parseThemes, resolvePalette, standOut, surpriseTheme, type CustomTheme } from '../src/themes';
+import { seededRandom } from '../src/rules';
 
 const meadowLike: CustomTheme = { id: 'a', name: 'Mine', bg: PALETTES.meadow.bg, cells: [...PALETTES.meadow.cells] };
 const nightLike: CustomTheme = { id: 'b', name: 'Dark', bg: PALETTES.night.bg, cells: [...PALETTES.night.cells] };
@@ -73,5 +74,29 @@ describe('parseThemes', () => {
   it('finds a free "My theme" name', () => {
     expect(nextThemeName([])).toBe('My theme 1');
     expect(nextThemeName([{ ...meadowLike, name: 'My theme 2' }])).toBe('My theme 3');
+  });
+});
+
+describe('surpriseTheme', () => {
+  it('makes seven colours where every cell shows up on the background and differs from the others', () => {
+    let dark = 0;
+    for (let k = 0; k < 200; k++) {
+      const t = surpriseTheme(seededRandom(`surprise ${k}`));
+      expect(t.bg).toMatch(/^#[0-9A-F]{6}$/);
+      expect(t.cells).toHaveLength(6);
+      for (const c of t.cells) {
+        expect(c).toMatch(/^#[0-9A-F]{6}$/);
+        expect(hardToSee(c, t.bg), `${k}: ${c} on ${t.bg}`).toBe(false);
+      }
+      for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) expect(difference(t.cells[i]!, t.cells[j]!), `${k}`).toBeGreaterThan(0.05);
+      if (isDark(t.bg)) dark++;
+    }
+    // Both light and dark backgrounds come up.
+    expect(dark).toBeGreaterThan(40);
+    expect(dark).toBeLessThan(160);
+  });
+
+  it('gives the same colours for the same random sequence', () => {
+    expect(surpriseTheme(seededRandom('x'))).toEqual(surpriseTheme(seededRandom('x')));
   });
 });

@@ -67,6 +67,43 @@ function moveAway(hex: string, bg: string, enough: (c: string) => boolean): stri
 /** The nearest colour, by lightness, that stands out clearly from the background. */
 export const standOut = (hex: string, bg: string) => moveAway(hex, bg, (c) => difference(c, bg) >= MIN_DIFFERENCE + 0.04);
 
+/** How the six cell hues spread around the colour wheel, in degrees from the first. */
+const HARMONIES: readonly (readonly number[])[] = [
+  [0, 30, 60, 90, 120, 150], // a run of neighbouring hues
+  [0, 120, 240, 40, 160, 280], // three groups, a third of the wheel apart
+  [0, 180, 30, 210, 60, 240], // pairs of opposites
+  [0, 137.5, 275, 52.5, 190, 327.5], // the golden angle: evenly spread, never repeating
+];
+/** Cell colours closer than this to each other are too alike to tell colonies apart. */
+const MIN_CELL_DIFFERENCE = 0.07;
+
+/**
+ * Seven colours that go together, for "Surprise me": a light or dark background tinted with a random
+ * hue, and six cell colours spread around the wheel by one of a few harmonies, with lightness and
+ * colourfulness varied. Every cell stands out from the background and from the other cells.
+ */
+export function surpriseTheme(random: () => number = Math.random): Pick<CustomTheme, 'bg' | 'cells'> {
+  const between = (a: number, b: number) => a + random() * (b - a);
+  let best: Pick<CustomTheme, 'bg' | 'cells'> | null = null;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const hue = random() * 360;
+    const dark = random() < 0.4;
+    const bg = lchToHex({ l: dark ? between(0.15, 0.22) : between(0.94, 0.98), c: between(0.008, 0.03), h: hue });
+    const spread = HARMONIES[Math.floor(random() * HARMONIES.length)]!;
+    const start = hue + between(20, 340);
+    const cells = spread.map((d, i) => standOut(lchToHex({
+      // Alternate lighter and deeper so neighbouring colonies differ in more than hue.
+      l: (dark ? 0.74 : 0.6) + (i % 2 ? 1 : -1) * between(0.04, 0.12),
+      c: between(0.09, 0.18),
+      h: (start + d + between(-8, 8)) % 360,
+    }), bg));
+    best = { bg, cells };
+    const distinct = cells.every((a, i) => cells.every((b, j) => j <= i || difference(a, b) >= MIN_CELL_DIFFERENCE));
+    if (distinct) break;
+  }
+  return best!;
+}
+
 /**
  * The full palette for a theme. Greys are tinted toward the background's hue, so a blue theme gets
  * blue-greys. The age ramp sorts the cell colours by lightness: newborns brightest, old cells deepest.
