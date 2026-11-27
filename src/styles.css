@@ -1,0 +1,151 @@
+/* The app's colours come from the active theme (palettes.ts), set on :root by main.ts. */
+:root {
+  --app-bg: #F3F5EF; --app-fg: #1D2A20; --app-panel: #FFFFFF; --app-line: #DDE3DA; --app-muted: #6B776D; --app-accent: #3E9A47;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--app-bg); color: var(--app-fg);
+  font: 13px/1.5 var(--body); -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none; transition: background-color .3s, color .3s;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+svg { display: block; }
+
+/* App: one column the height of the screen. The board takes whatever the bar and dock leave. */
+.app {
+  height: 100dvh; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+}
+.bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 18px; flex: none; }
+.brand { font: 800 19px/1 var(--display); letter-spacing: -.02em; display: flex; align-items: center; gap: 7px; }
+.logo { width: 18px; height: 18px; }
+.stats { font: 500 11px/1.2 var(--mono); color: var(--app-muted); display: flex; gap: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
+.bar-actions { display: flex; gap: 6px; }
+
+.board { flex: 1; min-height: 0; position: relative; margin: 0 8px; border-radius: 22px; overflow: hidden; }
+.board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.toast {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  background: var(--app-fg); color: var(--app-bg); font-weight: 600; font-size: 12px; padding: 6px 12px; border-radius: 99px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+
+/* Dock: folds to nothing (grid row 1fr → 0fr) so the board can grow into the space. */
+.dock-wrap { display: grid; grid-template-rows: 1fr; flex: none; }
+.app.ready .dock-wrap { transition: grid-template-rows .3s var(--ease); }
+.app.dock-hidden .dock-wrap { grid-template-rows: 0fr; }
+.dock { min-height: 0; overflow: hidden; }
+/* Padding lives on the inner box: a box can't fold smaller than its own padding. */
+.dock-inner { display: grid; gap: 12px; padding: 2px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.app.ready .dock { transition: opacity .2s ease; }
+.app.dock-hidden .dock { opacity: 0; }
+.handle {
+  justify-self: center; width: 56px; height: 22px; margin-top: 2px; border: 0; border-radius: 99px; padding: 0;
+  background: transparent; color: var(--app-muted); display: grid; place-items: center; cursor: pointer;
+}
+.handle:hover { background: var(--app-panel); color: var(--app-fg); }
+.handle svg { width: 18px; height: 18px; }
+
+/* Expand button: only while the dock is folded away, in the board's bottom-right corner. */
+.expand {
+  position: absolute; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: 40px; height: 40px; border: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; cursor: pointer;
+  background: color-mix(in srgb, var(--app-panel) 82%, transparent); color: var(--app-fg);
+  box-shadow: inset 0 0 0 1px var(--app-line), 0 6px 16px -8px rgba(0, 0, 0, .35);
+  backdrop-filter: blur(6px);
+  opacity: 0; visibility: hidden; transform: translateY(6px) scale(.9);
+}
+.app.ready .expand { transition: opacity .2s ease, transform .25s var(--ease), visibility 0s linear .25s; }
+.app.dock-hidden .expand { opacity: 1; visibility: visible; transform: none; transition-delay: .12s, .12s, 0s; }
+.expand svg { width: 20px; height: 20px; }
+
+.swatches { display: flex; justify-content: space-between; align-items: center; }
+.sw {
+  width: 28px; height: 28px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--c);
+  box-shadow: 0 0 0 2px var(--app-bg), 0 0 0 2px transparent; transition: box-shadow .15s, transform .15s;
+}
+.sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--app-bg), 0 0 0 5px var(--app-fg); transform: scale(1.04); }
+.sw.erase { background: var(--app-panel); color: var(--app-fg); display: grid; place-items: center; border: 1.5px dashed var(--app-muted); }
+.controls { display: flex; justify-content: space-between; align-items: center; }
+.ib {
+  width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; background: var(--app-panel); color: var(--app-fg);
+  display: grid; place-items: center; cursor: pointer; box-shadow: inset 0 0 0 1px var(--app-line);
+}
+.ib svg { width: 20px; height: 20px; }
+.ib-sm { width: 36px; height: 36px; }
+.ib-sm svg { width: 18px; height: 18px; }
+.play { width: 64px; height: 64px; border-radius: 50%; border: 0; padding: 0; background: var(--app-fg); color: var(--app-bg); display: grid; place-items: center; cursor: pointer; }
+.play svg { width: 26px; height: 26px; }
+.speed { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 11px; color: var(--app-muted); }
+.speed input { width: 100%; accent-color: var(--app-fg); }
+.speed output { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+
+/* Sheets (library, settings): slide up from the bottom. */
+.sheet {
+  border: 0; padding: 0; margin: auto auto 0; width: min(560px, 100%); max-width: 100%;
+  height: min(88dvh, 760px); max-height: none; border-radius: 24px 24px 0 0;
+  background: var(--app-bg); color: var(--app-fg); flex-direction: column;
+}
+.sheet[open] { display: flex; animation: sheet-in .3s var(--ease); }
+.sheet::backdrop { background: rgba(10, 15, 12, .35); }
+@keyframes sheet-in { from { transform: translateY(48px); opacity: 0; } }
+.sheet-head { display: flex; align-items: center; gap: 10px; padding: 16px 14px 12px 18px; flex: none; }
+.sheet-head h2 { margin: 0; font: 800 19px/1 var(--display); letter-spacing: -.02em; }
+.sheet-head .stats { margin-left: auto; }
+.sheet-head h2 + .ib { margin-left: auto; }
+.sheet-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; align-content: start;
+}
+
+.search { width: 100%; border: 0; border-radius: 14px; padding: 11px 14px; background: var(--app-panel); color: var(--app-fg); font: inherit; box-shadow: inset 0 0 0 1px var(--app-line); }
+.search::placeholder { color: var(--app-muted); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 0; border-radius: 99px; padding: 6px 11px; font: 500 12px var(--body); background: var(--app-panel); box-shadow: inset 0 0 0 1px var(--app-line); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--app-fg); color: var(--app-bg); box-shadow: none; }
+.lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.card { border: 0; padding: 0; text-align: left; background: var(--app-panel); border-radius: 18px; overflow: hidden; cursor: pointer; box-shadow: inset 0 0 0 1px var(--app-line); display: grid; }
+.card canvas { width: 100%; aspect-ratio: 4 / 3; display: block; }
+.card div { padding: 8px 11px 10px; display: grid; gap: 1px; }
+.card b { font: 700 14px/1.2 var(--display); }
+.card small { font: 500 10.5px/1.3 var(--mono); color: var(--app-muted); }
+.empty, .hint { margin: 0; color: var(--app-muted); font-size: 12px; }
+
+.group { display: grid; gap: 8px; }
+.group h3 { margin: 0; font: 500 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--app-muted); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--app-panel); border-radius: 12px; padding: 3px; box-shadow: inset 0 0 0 1px var(--app-line); }
+.seg button { border: 0; background: none; font: 500 12px var(--body); padding: 7px 4px; border-radius: 9px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--app-fg); color: var(--app-bg); }
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.theme { border: 0; border-radius: 14px; padding: 9px; cursor: pointer; display: grid; gap: 7px; font: 600 11.5px var(--body); text-align: left; background: var(--tb); color: var(--tf); box-shadow: inset 0 0 0 1px var(--app-line); }
+.theme[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--app-fg); }
+.theme .dots { display: flex; gap: 3px; }
+.theme .dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); }
+.list { background: var(--app-panel); border-radius: 14px; box-shadow: inset 0 0 0 1px var(--app-line); display: grid; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 0; background: none; text-align: left; cursor: pointer; width: 100%; }
+.row + .row { border-top: 1px solid var(--app-line); }
+.row span { display: grid; }
+.row small { color: var(--app-muted); font-size: 11px; }
+.row code { font: 500 11px var(--mono); color: var(--app-muted); }
+.radio { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--app-muted); flex: none; }
+.row[aria-pressed="true"] .radio { box-shadow: inset 0 0 0 5px var(--app-fg); }
+.switch { width: 36px; height: 22px; border-radius: 99px; background: var(--app-line); position: relative; flex: none; transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--app-panel); transition: transform .2s; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.row[aria-checked="true"] .switch { background: var(--app-accent); }
+.row[aria-checked="true"] .switch::after { transform: translateX(14px); }
+
+/* Wider screens: a little more breathing room around the column. */
+@media (min-width: 600px) {
+  .app { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
+  .sheet { margin-bottom: auto; border-radius: 24px; height: min(80dvh, 720px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

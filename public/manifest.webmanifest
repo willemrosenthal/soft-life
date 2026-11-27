@@ -1,0 +1,16 @@
+{
+  "name": "Softlife",
+  "short_name": "Softlife",
+  "description": "Conway's Game of Life with cells that merge into soft blobs.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F5EF",
+  "theme_color": "#F3F5EF",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
