@@ -333,7 +333,7 @@ for (const [panel, drawer] of [[libPanel, libDrawer], [setPanel, setDrawer], [la
   });
 }
 
-// Pop-ups beside the rail: colour, draw size, density and speed.
+// Pop-ups beside the rail: colour, draw size, density, speed, and the board actions (soup, clear, share).
 
 const popButtons = [...railEl.querySelectorAll<HTMLElement>('[data-pop]')];
 const pops = popButtons.map((b) => el(`#${b.dataset.pop}`));
@@ -406,6 +406,10 @@ el('#btnClear').addEventListener('click', () => {
   toast('Cleared. Draw something');
 });
 el('#btnShare').addEventListener('click', () => void share());
+// Each board action closes the pop-up it lives in.
+el('#actionsPop').addEventListener('click', (e) => {
+  if ((e.target as Element).closest('button')) closePops();
+});
 
 /** A range input bound to a numeric setting, with its readout. */
 function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'melt' | 'gaps' | 'critterAbundance', min: number, max: number, onChange: () => void): HTMLInputElement {
