@@ -179,7 +179,7 @@ svg { display: block; }
 .trend[data-trend="lively"] { color: var(--app-accent); }
 .trend[data-trend="full"], .trend[data-trend="dead"] { color: var(--app-fg); }
 .trend[data-trend="dead"] i { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
-.preview-gen { position: absolute; right: 12px; bottom: 9px; font: 500 10.5px var(--mono); color: var(--app-muted); font-variant-numeric: tabular-nums; }
+.preview-gen { position: absolute; right: 8px; bottom: 8px; padding: 4px 8px; border-radius: 99px; background: var(--glass); font: 500 10.5px/1 var(--mono); color: var(--app-muted); font-variant-numeric: tabular-nums; }
 .counts { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
 .count-btn {
   aspect-ratio: 1; min-width: 0; border: 0; padding: 0; border-radius: 10px; cursor: pointer; font: 600 13px var(--mono);
@@ -203,7 +203,8 @@ svg { display: block; }
 .pill-wide { padding: 11px 14px; font-size: 13px; }
 .rule-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .rule-card { position: relative; border-radius: 16px; overflow: hidden; background: var(--app-panel); box-shadow: inset 0 0 0 1px var(--app-line); }
-.rule-card[aria-current="true"] { box-shadow: inset 0 0 0 2px var(--app-fg); }
+/* An outline, not an inset shadow: it draws over the thumbnail, so the whole edge shows. */
+.rule-card[aria-current="true"] { outline: 2px solid var(--app-fg); outline-offset: -2px; }
 .rule-card-main { display: grid; width: 100%; border: 0; padding: 0; background: none; text-align: left; cursor: pointer; }
 .rule-card canvas { width: 100%; aspect-ratio: 4 / 3; display: block; }
 .rule-card-main span { display: grid; padding: 6px 10px 8px; min-width: 0; }

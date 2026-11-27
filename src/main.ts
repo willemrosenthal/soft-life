@@ -11,6 +11,10 @@ import { Life, parseRule, type Rule } from './life';
 import { PALETTES, type Palette, type PaletteId } from './palettes';
 import { PATTERNS, type PatternCategory } from './patterns';
 import { BoardRenderer, drawCells, type View } from './render';
+import {
+  NAME_MAX, PRESETS, TREND_LABELS, TrendWatcher, formatRule, loadRules, mutateRule, nextRuleName, pickSurprise, ruleName,
+  saveRules, seededRandom, type SavedRule, type Trend,
+} from './rules';
 import { DENSITY_MAX, DENSITY_MIN, loadSettings, saveSettings, type Settings } from './settings';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
 
@@ -27,6 +31,8 @@ function el<T extends Element = HTMLElement>(selector: string, root: ParentNode 
 
 const settings: Settings = loadSettings();
 let rule: Rule = parseRule(settings.rule)!;
+/** The player's own rules, made in the Rule lab. */
+let savedRules: SavedRule[] = loadRules();
 /** Drawing colour: a colony index (0-based) or the eraser. */
 let brush: number | 'erase' = 0;
 let running = true;
@@ -107,6 +113,7 @@ function frame(now: number): void {
     dirty = false;
   }
   lastT = t;
+  if (labDrawer.amount > 0) runPreview(now);
   requestAnimationFrame(frame);
 }
 
@@ -225,6 +232,7 @@ const railEl = el('#rail');
 const railTab = el('#railTab');
 const libPanel = el('#libPanel');
 const setPanel = el('#setPanel');
+const labPanel = el('#labPanel');
 const libButton = el('#btnLib');
 const setButton = el('#btnSet');
 
@@ -246,6 +254,7 @@ function panelToggled(panel: HTMLElement, opener: HTMLElement, open: boolean): v
     closePops();
     el<HTMLElement>('[data-close]', panel).focus({ preventScroll: true });
     if (panel === libPanel) drawThumbnails();
+    if (panel === labPanel) fitPreview();
   } else if (panel.contains(document.activeElement)) {
     opener.focus({ preventScroll: true });
   }
@@ -263,13 +272,15 @@ const stack = new DrawerStack(app, el('#shade'), {
 stack.add('rail', rail);
 const libDrawer = stack.add('lib', new Drawer(libPanel, true, (open) => panelToggled(libPanel, libButton, open)));
 const setDrawer = stack.add('set', new Drawer(setPanel, true, (open) => panelToggled(setPanel, setButton, open)));
+// The Rule lab opens from Settings, so closing it hands focus back to the Settings button.
+const labDrawer = stack.add('lab', new Drawer(labPanel, true, (open) => panelToggled(labPanel, setButton, open)));
 
 railTab.addEventListener('click', () => rail.setOpen(true));
 libButton.addEventListener('click', () => stack.openModal(libDrawer));
 setButton.addEventListener('click', () => stack.openModal(setDrawer));
-for (const panel of [libPanel, setPanel]) {
+for (const [panel, drawer] of [[libPanel, libDrawer], [setPanel, setDrawer], [labPanel, labDrawer]] as const) {
   panel.addEventListener('click', (e) => {
-    if ((e.target as Element).closest('[data-close]')) (panel === libPanel ? libDrawer : setDrawer).setOpen(false);
+    if ((e.target as Element).closest('[data-close]')) drawer.setOpen(false);
   });
 }
 
@@ -403,11 +414,23 @@ function drawBrushPreview(): void {
 
 const toastEl = el('#toast');
 let toastTimer = 0;
-function toast(message: string): void {
+/** A short message at the top. With an action (like Undo) it carries a button and stays a little longer. */
+function toast(message: string, action?: { label: string; run: () => void }): void {
   toastEl.textContent = message;
+  toastEl.classList.toggle('with-action', !!action);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = action.label;
+    b.addEventListener('click', () => {
+      toastEl.hidden = true;
+      action.run();
+    });
+    toastEl.append(b);
+  }
   toastEl.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => { toastEl.hidden = true; }, 1600);
+  toastTimer = window.setTimeout(() => { toastEl.hidden = true; }, action ? 4000 : 1600);
 }
 
 const swatchBox = el('#swatches');
@@ -545,11 +568,11 @@ setPanel.addEventListener('click', (e) => {
     const key = group.dataset.key as 'style' | 'mode' | 'rule';
     const value = choice.dataset.v!;
     if (key === 'rule') {
-      settings.rule = value;
-      rule = parseRule(value)!;
+      setBoardRule(value);
     } else if (key === 'style') {
       settings.style = value as Settings['style'];
       drawThumbnails();
+      drawRuleThumbnails();
       drawBrushPreview();
     } else {
       settings.mode = value as Settings['mode'];
@@ -565,7 +588,34 @@ setPanel.addEventListener('click', (e) => {
     syncSettingsPanel();
     dirty = true;
   }
+  if (target.closest('#openLab')) openLab();
 });
+
+const ruleList = el('#ruleList');
+
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** The Rule list in Settings: presets, the player's saved rules, the rule in use if it's neither, and the way into the lab. */
+function buildRuleList(): void {
+  const row = (name: string, code: string) =>
+    `<button type="button" class="row" data-v="${code}"><span>${escapeHtml(name)}<code>${code}</code></span><i class="radio"></i></button>`;
+  let html = PRESETS.map((p) => row(p.name, p.rule)).join('');
+  if (savedRules.length) html += `<div class="list-sub">My rules</div>${savedRules.map((r) => row(r.name, r.rule)).join('')}`;
+  // A rule from a shared link, or one tried in the lab but not saved: list it so the choice stays visible.
+  if (![...PRESETS, ...savedRules].some((r) => r.rule === settings.rule)) html += row(ruleName(settings.rule, savedRules) ?? 'Unsaved rule', settings.rule);
+  html += `<button type="button" class="row row-action" id="openLab"><span>Make your own rule<small>Try, tweak and save rules in the Rule lab</small></span>`
+    + `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>`;
+  ruleList.innerHTML = html;
+  syncSettingsPanel();
+}
+
+/** Run the board on this rule (already checked) and remember it. */
+function setBoardRule(code: string): void {
+  rule = parseRule(code)!;
+  settings.rule = formatRule(rule); // one spelling, so it matches the lists
+  save();
+  buildRuleList();
+}
 
 function applyTheme(): void {
   const p = palette();
@@ -580,8 +630,251 @@ function applyTheme(): void {
   buildThemes();
   buildSwatches();
   drawThumbnails();
+  drawRuleThumbnails();
   drawBrushPreview();
   updateRing();
+  labDirty = true;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Rule lab: try a rule on fresh soup, tweak it, save it.
+
+/** The preview's grid: 4:3, like its frame. It always wraps, so every rule gets the same fair test. */
+const PREVIEW_COLS = 36;
+const PREVIEW_ROWS = 27;
+const PREVIEW_SPEED = 10;
+/** Saved-rule thumbnails: a small soup run this many generations, the same every time for a given rule. */
+const THUMB_COLS = 24;
+const THUMB_ROWS = 18;
+const THUMB_GENS = 40;
+
+const labCanvas = el<HTMLCanvasElement>('#labCv');
+const labCtx = labCanvas.getContext('2d')!;
+const labTrendEl = el('#labTrend');
+const labGenEl = el('#labGen');
+const labLine = el('#labLine');
+const labName = el<HTMLInputElement>('#labName');
+const labSaveBtn = el('#labSaveBtn');
+const labCards = el('#labCards');
+const preview = new Life(PREVIEW_COLS, PREVIEW_ROWS);
+const previewRenderer = new BoardRenderer();
+const previewView: View = { width: 0, height: 0, cell: 0, ox: 0, oy: 0 };
+const trendWatcher = new TrendWatcher();
+let labRule: Rule = rule;
+/** The saved rule being edited, if any: Save updates it instead of adding a new one. */
+let labEditing: string | null = null;
+let labLastStep = 0;
+let labLastT = 1;
+let labDirty = true;
+
+function fitPreview(): void {
+  const dpr = Math.min(devicePixelRatio || 1, 3);
+  const w = labCanvas.clientWidth;
+  const h = labCanvas.clientHeight;
+  if (!w || !h) return;
+  labCanvas.width = Math.round(w * dpr);
+  labCanvas.height = Math.round(h * dpr);
+  labCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  previewView.width = w;
+  previewView.height = h;
+  previewView.cell = Math.min(w / PREVIEW_COLS, h / PREVIEW_ROWS);
+  previewView.ox = (w - PREVIEW_COLS * previewView.cell) / 2;
+  previewView.oy = (h - PREVIEW_ROWS * previewView.cell) / 2;
+  labDirty = true;
+}
+new ResizeObserver(fitPreview).observe(labCanvas);
+
+function showTrend(trend: Trend): void {
+  labTrendEl.dataset.trend = trend;
+  el('span', labTrendEl).textContent = TREND_LABELS[trend];
+}
+
+function restartPreview(): void {
+  preview.soup();
+  trendWatcher.reset();
+  showTrend('starting');
+  labGenEl.textContent = 'Gen 0';
+  labLastStep = performance.now();
+  labDirty = true;
+}
+
+/** Called from the main loop while the lab is showing. */
+function runPreview(now: number): void {
+  const interval = 1000 / PREVIEW_SPEED;
+  if (now - labLastStep >= interval) {
+    preview.step(labRule, true);
+    labLastStep = now;
+    showTrend(trendWatcher.update(preview.cur));
+    labGenEl.textContent = `Gen ${preview.gen}`;
+  }
+  const t = !settings.smooth || reducedMotion.matches ? 1 : Math.min(1, (now - labLastStep) / (interval * 0.85));
+  if (t < 1 || labLastT < 1 || labDirty) {
+    previewRenderer.draw(labCtx, preview, previewView, palette(), { style: settings.style, mode: settings.mode, critters: false }, t, now);
+    labDirty = false;
+  }
+  labLastT = t;
+}
+
+// The neighbour-count buttons: born with 1–8 (0 would make the board flash), survive with 0–8.
+const countRows = { born: el('#labBorn'), survive: el('#labSurvive') };
+for (const [which, row] of Object.entries(countRows) as ['born' | 'survive', HTMLElement][]) {
+  row.innerHTML = Array.from({ length: 9 }, (_, n) => {
+    const label = `${which === 'born' ? 'Born with' : 'Survives with'} ${n} neighbour${n === 1 ? '' : 's'}`;
+    const off = which === 'born' && n === 0;
+    return `<button type="button" class="count-btn" data-n="${n}" aria-label="${label}" aria-pressed="false"${off ? ' disabled title="Off: every empty spot would come alive at once and the board would flash"' : ''}>${n}</button>`;
+  }).join('');
+  row.addEventListener('click', (e) => {
+    const b = (e.target as Element).closest<HTMLButtonElement>('[data-n]');
+    if (!b || b.disabled) return;
+    const n = Number(b.dataset.n);
+    const set = new Set(labRule[which]);
+    if (set.has(n)) set.delete(n);
+    else set.add(n);
+    labRule = { ...labRule, [which]: set };
+    labChanged();
+  });
+}
+
+/** The lab's rule changed: update the buttons, the summary and the cards, and give the rule a fresh start. */
+function labChanged(restart = true): void {
+  for (const [which, row] of Object.entries(countRows) as ['born' | 'survive', HTMLElement][]) {
+    for (const b of row.querySelectorAll<HTMLElement>('[data-n]')) b.setAttribute('aria-pressed', String(labRule[which].has(Number(b.dataset.n))));
+  }
+  const code = formatRule(labRule);
+  const name = ruleName(code, savedRules);
+  labLine.innerHTML = `<code>${code}</code><span>${name ? escapeHtml(name) : 'A new rule, not saved yet'}</span>`;
+  labName.placeholder = ruleName(code, []) ?? nextRuleName(savedRules);
+  labSaveBtn.textContent = labEditing ? 'Save changes' : 'Save';
+  for (const card of labCards.querySelectorAll<HTMLElement>('[data-id]')) {
+    card.setAttribute('aria-current', String(savedRules.find((r) => r.id === card.dataset.id)?.rule === code));
+  }
+  if (restart) restartPreview();
+}
+
+/** Put a rule in the lab. `saved` means it's one of the player's rules, to be edited in place. */
+function loadIntoLab(code: string, saved: SavedRule | null): void {
+  labRule = parseRule(code)!;
+  labEditing = saved?.id ?? null;
+  labName.value = saved?.name ?? '';
+  labChanged();
+}
+
+function openLab(): void {
+  loadIntoLab(settings.rule, savedRules.find((r) => r.rule === settings.rule) ?? null);
+  buildRuleCards();
+  stack.openModal(labDrawer);
+}
+
+el('#labBack').addEventListener('click', () => stack.openModal(setDrawer));
+el('#labSoup').addEventListener('click', restartPreview);
+el('#labMutate').addEventListener('click', () => {
+  labRule = mutateRule(labRule);
+  labChanged();
+});
+el('#labSurprise').addEventListener('click', () => {
+  const pick = pickSurprise(formatRule(labRule));
+  loadIntoLab(pick.rule, null);
+  toast(`Trying ${pick.name}`);
+});
+el('#labUse').addEventListener('click', () => {
+  const code = formatRule(labRule);
+  setBoardRule(code);
+  labDrawer.setOpen(false);
+  toast(`Board now runs ${ruleName(code, savedRules) ?? code}`);
+});
+el('#labSave').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const code = formatRule(labRule);
+  const preset = PRESETS.find((p) => p.rule === code);
+  const twin = savedRules.find((r) => r.rule === code && r.id !== labEditing);
+  if (preset) return toast(`That's ${preset.name}, already in Settings`);
+  if (twin) return toast(`Already saved as ${twin.name}`);
+  const name = (labName.value.trim() || labName.placeholder).slice(0, NAME_MAX);
+  const editing = savedRules.find((r) => r.id === labEditing);
+  if (editing) {
+    editing.name = name;
+    editing.rule = code;
+  } else {
+    labEditing = `r${Date.now().toString(36)}`;
+    savedRules.push({ id: labEditing, name, rule: code });
+  }
+  labName.value = name;
+  rulesChanged();
+  labChanged(false);
+  toast(`Saved ${name}`);
+});
+
+/** The saved list changed: keep it, and refresh everything that shows it. */
+function rulesChanged(): void {
+  saveRules(savedRules);
+  buildRuleList();
+  buildRuleCards();
+}
+
+function buildRuleCards(): void {
+  const code = formatRule(labRule);
+  labCards.innerHTML = savedRules.map((r) => `
+    <div class="rule-card" data-id="${r.id}" aria-current="${r.rule === code}">
+      <button type="button" class="rule-card-main" data-load="${r.id}" aria-label="Open ${escapeHtml(r.name)} in the lab">
+        <canvas aria-hidden="true" data-rule="${r.rule}"></canvas><span><b>${escapeHtml(r.name)}</b><small>${r.rule}</small></span>
+      </button>
+      <button type="button" class="rule-card-x" data-delete="${r.id}" aria-label="Delete ${escapeHtml(r.name)}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>`).join('');
+  el('#labCount').textContent = savedRules.length ? String(savedRules.length) : '';
+  el('#labEmpty').hidden = savedRules.length > 0;
+  drawRuleThumbnails();
+}
+
+labCards.addEventListener('click', (e) => {
+  const t = e.target as Element;
+  const del = t.closest<HTMLElement>('[data-delete]');
+  if (del) {
+    const at = savedRules.findIndex((r) => r.id === del.dataset.delete);
+    if (at < 0) return;
+    const [gone] = savedRules.splice(at, 1);
+    if (labEditing === gone!.id) {
+      labEditing = null;
+      labChanged(false);
+    }
+    rulesChanged();
+    toast(`Deleted ${gone!.name}`, {
+      label: 'Undo',
+      run: () => {
+        savedRules.splice(Math.min(at, savedRules.length), 0, gone!);
+        rulesChanged();
+      },
+    });
+    return;
+  }
+  const load = t.closest<HTMLElement>('[data-load]');
+  const saved = load && savedRules.find((r) => r.id === load.dataset.load);
+  if (saved) loadIntoLab(saved.rule, saved);
+});
+
+/** Each saved rule's thumbnail: what a small soup looks like after a while under it. */
+function drawRuleThumbnails(): void {
+  for (const c of labCards.querySelectorAll<HTMLCanvasElement>('canvas[data-rule]')) {
+    if (!c.clientWidth) continue;
+    const code = c.dataset.rule!;
+    const sample = new Life(THUMB_COLS, THUMB_ROWS);
+    sample.soup(seededRandom(code));
+    const r = parseRule(code)!;
+    for (let k = 0; k < THUMB_GENS; k++) sample.step(r, true);
+    const { ctx: g, w, h } = fitSmallCanvas(c);
+    const cell = Math.min(w / THUMB_COLS, h / THUMB_ROWS);
+    const n = THUMB_COLS * THUMB_ROWS;
+    const size = new Float32Array(n);
+    const colour = new Int8Array(n);
+    for (let i = 0; i < n; i++) {
+      size[i] = sample.cur[i] ? 1 : 0;
+      colour[i] = Math.max(0, sample.cur[i]! - 1);
+    }
+    g.fillStyle = palette().bg;
+    g.fillRect(0, 0, w, h);
+    drawCells(g, { cols: THUMB_COLS, rows: THUMB_ROWS, cell, ox: (w - THUMB_COLS * cell) / 2, oy: (h - THUMB_ROWS * cell) / 2, size, colour, colours: palette().cells, style: settings.style });
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -616,12 +909,7 @@ async function share(): Promise<void> {
 function loadFromLink(): boolean {
   const shared = decodeBoard(location.hash);
   if (!shared) return false;
-  if (shared.rule && shared.rule !== settings.rule) {
-    settings.rule = shared.rule;
-    rule = parseRule(shared.rule)!;
-    save();
-    syncSettingsPanel();
-  }
+  if (shared.rule && shared.rule !== settings.rule) setBoardRule(shared.rule);
   life.place(shared.cells, sharedColony);
   boardChanged();
   toast('Loaded a shared pattern');
@@ -654,7 +942,7 @@ document.addEventListener('keydown', (e) => {
 // Start
 
 applyTheme();
-syncSettingsPanel();
+setBoardRule(settings.rule);
 buildLibrary();
 syncSize();
 rail.setOpen(!settings.railHidden, false);
