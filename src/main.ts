@@ -5,7 +5,7 @@ import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/jetbrains-mono/500.css';
 import './styles.css';
-import { BRUSH_MAX, BRUSH_MIN, brushCells, brushCentre, strokePoints, type Point } from './brush';
+import { BRUSH_MAX, BRUSH_MIN, brushAt, brushCells, brushCentre, strokePoints, type Point } from './brush';
 import { ABUNDANCE_MAX, ABUNDANCE_MIN } from './critters';
 import { Drawer, DrawerStack } from './drawers';
 import { Life, parseRule, type Rule } from './life';
@@ -194,7 +194,7 @@ function cellAt(p: Point): number {
 }
 
 function dab(p: Point): void {
-  for (const i of brushCells(p, settings.brushSize, life.cols, life.rows, settings.wrap)) life.setCell(i, paintColony);
+  for (const i of brushCells(p, brushAt(settings.brushStep), life.cols, life.rows, settings.wrap)) life.setCell(i, paintColony);
 }
 
 function startPaint(e: PointerEvent): void {
@@ -239,7 +239,7 @@ function setHover(p: Point | null, isMouse: boolean): void {
   updateRing();
 }
 function updateRing(): void {
-  renderer.brushRing = hover && (hoverIsMouse || painting) ? { ...brushCentre(hover, settings.brushSize), size: settings.brushSize, colour: brush === 'erase' ? null : palette().cells[brush]! } : null;
+  renderer.brushRing = hover && (hoverIsMouse || painting) ? { ...brushCentre(hover, brushAt(settings.brushStep)), size: brushAt(settings.brushStep).width, colour: brush === 'erase' ? null : palette().cells[brush]! } : null;
   dirty = true;
 }
 
@@ -415,7 +415,7 @@ el('#actionsPop').addEventListener('click', (e) => {
 });
 
 /** A range input bound to a numeric setting, with its readout. */
-function bindRange(id: string, key: 'density' | 'brushSize' | 'stickiness' | 'diagonals' | 'melt' | 'gaps' | 'critterAbundance', min: number, max: number, onChange: () => void): HTMLInputElement {
+function bindRange(id: string, key: 'density' | 'brushStep' | 'stickiness' | 'diagonals' | 'melt' | 'gaps' | 'critterAbundance', min: number, max: number, onChange: () => void): HTMLInputElement {
   const input = el<HTMLInputElement>(`#${id}`);
   input.min = String(min);
   input.max = String(max);
@@ -438,8 +438,9 @@ function syncBoardPop(): void {
   densityOut.textContent = `${life.cols} × ${life.rows}`;
 }
 function syncSize(): void {
-  sizeOut.textContent = settings.brushSize === 1 ? '1 dot' : `${settings.brushSize} dots`;
-  sizeBadge.textContent = String(settings.brushSize);
+  const b = brushAt(settings.brushStep);
+  sizeOut.textContent = b.name;
+  sizeBadge.textContent = String(b.width);
   drawBrushPreview();
   updateRing();
 }
@@ -462,7 +463,7 @@ bindRange('density', 'density', DENSITY_MIN, DENSITY_MAX, () => {
   fitCanvas();
   fitGrid();
 });
-bindRange('size', 'brushSize', BRUSH_MIN, BRUSH_MAX, syncSize);
+bindRange('size', 'brushStep', BRUSH_MIN, BRUSH_MAX, syncSize);
 
 const stickyOut = el('#stickyOut');
 const diagOut = el('#diagOut');
@@ -589,9 +590,10 @@ function drawBrushPreview(): void {
   const c = el<HTMLCanvasElement>('#sizePreview');
   if (!c.clientWidth) return; // pop-up closed: drawn when it opens
   const { ctx: g, w } = fitSmallCanvas(c);
-  const n = settings.brushSize;
+  const b = brushAt(settings.brushStep);
+  const n = b.width;
   const size = new Float32Array(n * n);
-  for (const i of brushCells({ x: n / 2, y: n / 2 }, n, n, n, false)) size[i] = 1;
+  for (const i of brushCells({ x: n / 2, y: n / 2 }, b, n, n, false)) size[i] = 1;
   const cell = w / Math.max(n, 3);
   const offset = (w - cell * n) / 2;
   g.clearRect(0, 0, w, w);
@@ -1397,7 +1399,7 @@ const demoHost: DemoHost = {
   value: (key) => {
     if (key === 'speed') return Math.max(0, SPEED_STEPS.indexOf(settings.speed));
     if (key === 'labSpeed') return Math.max(0, SPEED_STEPS.indexOf(settings.labSpeed));
-    if (key === 'brush') return settings.brushSize;
+    if (key === 'brush') return settings.brushStep;
     return settings[key];
   },
   // From the lab, the rule being made there; anywhere else, the board's.

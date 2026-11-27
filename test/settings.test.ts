@@ -3,8 +3,13 @@ import { DEFAULT_SETTINGS, formatSpeed, parseSettings } from '../src/settings';
 
 describe('parseSettings', () => {
   it('reads back saved settings', () => {
-    const saved = { ...DEFAULT_SETTINGS, palette: 'night', style: 'pixels', rule: 'B36/S23', speed: 20, labSpeed: 1 / 2, density: 40, stickiness: 80, diagonals: 60, melt: 0, gaps: 90, brushSize: 3, railHidden: true, critterAbundance: 90, stylePreview: 'live', stylePreviewShown: true };
+    const saved = { ...DEFAULT_SETTINGS, palette: 'night', style: 'pixels', rule: 'B36/S23', speed: 20, labSpeed: 1 / 2, density: 40, stickiness: 80, diagonals: 60, melt: 0, gaps: 90, brushStep: 3, railHidden: true, critterAbundance: 90, stylePreview: 'live', stylePreviewShown: true };
     expect(parseSettings(JSON.parse(JSON.stringify(saved)))).toEqual(saved);
+  });
+
+  it('turns an old saved brush width into the matching brush', () => {
+    expect(parseSettings({ brushSize: 3 }).brushStep).toBe(4);
+    expect(parseSettings({ brushSize: 3, brushStep: 1 }).brushStep).toBe(1);
   });
 
   it('keeps a custom theme, even one that has since been deleted (the app falls back to Meadow then)', () => {
@@ -13,7 +18,7 @@ describe('parseSettings', () => {
 
   it('falls back to defaults for anything missing, unknown or out of range', () => {
     expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS);
-    expect(parseSettings({ palette: 'toString', style: 'blobs', rule: 'B9/S1', speed: 99, labSpeed: 0.25, wrap: 'yes', density: 8, stickiness: 101, diagonals: 150, melt: -1, gaps: 'wide', brushSize: 2.5, stylePreview: 'video', stylePreviewShown: 'yes', critterAbundance: 101 })).toEqual(DEFAULT_SETTINGS);
+    expect(parseSettings({ palette: 'toString', style: 'blobs', rule: 'B9/S1', speed: 99, labSpeed: 0.25, wrap: 'yes', density: 8, stickiness: 101, diagonals: 150, melt: -1, gaps: 'wide', brushStep: 2.5, stylePreview: 'video', stylePreviewShown: 'yes', critterAbundance: 101 })).toEqual(DEFAULT_SETTINGS);
   });
 });
 

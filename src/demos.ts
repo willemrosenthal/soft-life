@@ -1,4 +1,4 @@
-import { brushCells, type Point } from './brush';
+import { BRUSH_MAX, BRUSH_MIN, brushAt, brushCells, type Point } from './brush';
 import { Life, type Rule } from './life';
 import type { Palette } from './palettes';
 import { BoardRenderer, type Look, type View } from './render';
@@ -266,22 +266,22 @@ const SLIDERS: Record<Exclude<DemoKey, 'rules'>, () => SliderSpec> = {
     const rows = 11;
     const life = new Life(cols, rows);
     return {
-      key: 'brush', min: 1, max: 7, whole: true, ends: ['1 dot', '7 dots'], period: 9000,
-      badge: (v) => (Math.round(v) === 1 ? '1 dot wide' : `${Math.round(v)} dots wide`),
+      key: 'brush', min: BRUSH_MIN, max: BRUSH_MAX, whole: true, ends: [brushAt(BRUSH_MIN).name, brushAt(BRUSH_MAX).name], period: 9000,
+      badge: (v) => brushAt(v).name,
       caption: (v) => {
-        const n = Math.round(v);
-        return n === 1 ? '<b>1 dot.</b> Place single cells exactly, for building patterns by hand.'
-          : n < 5 ? `<b>${n} dots wide.</b> A soft round brush for quick shapes.` : `<b>${n} dots wide.</b> Paint big areas and let them break apart.`;
+        const b = brushAt(v);
+        return b.width === 1 ? '<b>1 dot.</b> Place single cells exactly, for building patterns by hand.'
+          : b.width < 5 ? `<b>${b.name}.</b> A small brush for quick, thin shapes.` : `<b>${b.name}.</b> Paint big areas and let them break apart.`;
       },
       draw: ({ ctx, w, h }, v, now, host) => {
         // A stroke drawn along a wave over four seconds, then wiped and drawn again.
-        const n = Math.round(v);
+        const b = brushAt(v);
         const t = (now % 4000) / 4000;
         const at = (u: number): Point => ({ x: 3 + u * (cols - 6), y: rows / 2 + Math.sin(u * Math.PI * 2) * 2.4 });
         life.clear();
-        for (let k = 0; k <= 60; k++) for (const i of brushCells(at((k / 60) * t), n, cols, rows, false)) life.setCell(i, 1);
+        for (let k = 0; k <= 60; k++) for (const i of brushCells(at((k / 60) * t), b, cols, rows, false)) life.setCell(i, 1);
         const p = at(t);
-        renderer.brushRing = { x: p.x, y: p.y, size: n, colour: host.palette().cells[0]! };
+        renderer.brushRing = { x: p.x, y: p.y, size: b.width, colour: host.palette().cells[0]! };
         renderer.draw(ctx, life, fitView(w, h, cols, rows), host.palette(), look(host), 1, now);
         renderer.brushRing = null;
       },

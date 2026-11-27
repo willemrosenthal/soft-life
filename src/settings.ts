@@ -1,4 +1,4 @@
-import { BRUSH_MAX, BRUSH_MIN } from './brush';
+import { BRUSH_MAX, BRUSH_MIN, stepForWidth } from './brush';
 import { ABUNDANCE_MAX, ABUNDANCE_MIN, DEFAULT_ABUNDANCE } from './critters';
 import { parseRule } from './life';
 import type { CellStyle, ColourMode } from './render';
@@ -33,7 +33,8 @@ export interface Settings {
   /** Goo style, with melt: the holes where mixed colours meet, 0 (closed) to 100 (wide). */
   gaps: number;
   /** How many dots wide a stroke draws. */
-  brushSize: number;
+  /** Index into BRUSHES. */
+  brushStep: number;
   /** The tool rail tucked away off the right edge. */
   railHidden: boolean;
   /** The cell style preview in Settings: still shapes, or a live board at the board's speed. */
@@ -62,7 +63,7 @@ export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 0, melt: 75, gaps: 50, brushSize: 1, railHidden: false,
+  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 0, melt: 75, gaps: 50, brushStep: 0, railHidden: false,
   stylePreview: 'shapes', stylePreviewShown: false,
 };
 
@@ -95,7 +96,8 @@ export function parseSettings(value: unknown): Settings {
     diagonals: int(v.diagonals, DIAGONALS_MIN, DIAGONALS_MAX, d.diagonals),
     melt: int(v.melt, MELT_MIN, MELT_MAX, d.melt),
     gaps: int(v.gaps, GAPS_MIN, GAPS_MAX, d.gaps),
-    brushSize: int(v.brushSize, BRUSH_MIN, BRUSH_MAX, d.brushSize),
+    // Older saves kept a width (`brushSize`), from before the in-between brushes.
+    brushStep: int(v.brushStep, BRUSH_MIN, BRUSH_MAX, typeof v.brushSize === 'number' ? stepForWidth(v.brushSize) : d.brushStep),
     railHidden: flag(v.railHidden, d.railHidden),
     stylePreview: oneOf(v.stylePreview, PREVIEWS, d.stylePreview),
     stylePreviewShown: flag(v.stylePreviewShown, d.stylePreviewShown),
