@@ -1,11 +1,16 @@
-import { BRUSH_MAX, BRUSH_MIN, stepForWidth } from './brush';
-import { readItem, writeItem } from './store';
-import { ABUNDANCE_MAX, ABUNDANCE_MIN, DEFAULT_ABUNDANCE } from './critters';
-import { parseRule } from './life';
-import type { CellStyle, ColourMode } from './render';
-import { isThemeKey } from './themes';
-import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
-import { DIAGONALS_MAX, DIAGONALS_MIN, STICKINESS_MAX, STICKINESS_MIN } from './slime';
+import { BRUSH_MAX, BRUSH_MIN, stepForWidth } from "./brush";
+import { readItem, writeItem } from "./store";
+import { ABUNDANCE_MAX, ABUNDANCE_MIN, DEFAULT_ABUNDANCE } from "./critters";
+import { parseRule } from "./life";
+import type { CellStyle, ColourMode } from "./render";
+import { isThemeKey } from "./themes";
+import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from "./melt";
+import {
+  DIAGONALS_MAX,
+  DIAGONALS_MIN,
+  STICKINESS_MAX,
+  STICKINESS_MIN,
+} from "./slime";
 
 /** Everything remembered between visits. The board itself isn't saved; share a link for that. */
 export interface Settings {
@@ -46,7 +51,7 @@ export interface Settings {
   stylePreviewShown: boolean;
 }
 
-export type StylePreview = 'shapes' | 'live';
+export type StylePreview = "shapes" | "live";
 
 export const SPEED_MIN = 1;
 export const SPEED_MAX = 30;
@@ -65,42 +70,81 @@ export const DENSITY_MIN = 12;
 export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
-  palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 90, melt: 75, gaps: 50, brushStep: 0, rotateColours: false, railHidden: false,
-  stylePreview: 'shapes', stylePreviewShown: false,
+  palette: "meadow",
+  style: "goo",
+  mode: "colonies",
+  rule: "B3/S23",
+  wrap: true,
+  critters: true,
+  critterAbundance: DEFAULT_ABUNDANCE,
+  smooth: true,
+  speed: 5,
+  labSpeed: 10,
+  density: 18,
+  stickiness: 50,
+  diagonals: 90,
+  melt: 75,
+  gaps: 50,
+  brushStep: 0,
+  rotateColours: false,
+  railHidden: false,
+  stylePreview: "shapes",
+  stylePreviewShown: false,
 };
 
-const STYLES: readonly CellStyle[] = ['goo', 'dots', 'pixels'];
-const MODES: readonly ColourMode[] = ['colonies', 'solo', 'age'];
-const PREVIEWS: readonly StylePreview[] = ['shapes', 'live'];
-const KEY = 'softlife:settings';
+const STYLES: readonly CellStyle[] = ["goo", "dots", "pixels"];
+const MODES: readonly ColourMode[] = ["colonies", "solo", "age"];
+const PREVIEWS: readonly StylePreview[] = ["shapes", "live"];
+const KEY = "softlife:settings";
 
 /** Saved data may be from an older version or damaged: anything unusable falls back to its default. */
 export function parseSettings(value: unknown): Settings {
   const d = DEFAULT_SETTINGS;
-  if (typeof value !== 'object' || value === null) return { ...d };
+  if (typeof value !== "object" || value === null) return { ...d };
   const v = value as Record<string, unknown>;
-  const flag = (x: unknown, fallback: boolean) => (typeof x === 'boolean' ? x : fallback);
-  const oneOf = <T extends string>(x: unknown, options: readonly T[], fallback: T) => (options.includes(x as T) ? (x as T) : fallback);
-  const int = (x: unknown, min: number, max: number, fallback: number) => (typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : fallback);
+  const flag = (x: unknown, fallback: boolean) =>
+    typeof x === "boolean" ? x : fallback;
+  const oneOf = <T extends string>(
+    x: unknown,
+    options: readonly T[],
+    fallback: T,
+  ) => (options.includes(x as T) ? (x as T) : fallback);
+  const int = (x: unknown, min: number, max: number, fallback: number) =>
+    typeof x === "number" && Number.isInteger(x) && x >= min && x <= max
+      ? x
+      : fallback;
   return {
     palette: isThemeKey(v.palette) ? v.palette : d.palette,
     style: oneOf(v.style, STYLES, d.style),
     mode: oneOf(v.mode, MODES, d.mode),
-    rule: typeof v.rule === 'string' && parseRule(v.rule) ? v.rule : d.rule,
+    rule: typeof v.rule === "string" && parseRule(v.rule) ? v.rule : d.rule,
     wrap: flag(v.wrap, d.wrap),
     critters: flag(v.critters, d.critters),
-    critterAbundance: int(v.critterAbundance, ABUNDANCE_MIN, ABUNDANCE_MAX, d.critterAbundance),
+    critterAbundance: int(
+      v.critterAbundance,
+      ABUNDANCE_MIN,
+      ABUNDANCE_MAX,
+      d.critterAbundance,
+    ),
     smooth: flag(v.smooth, d.smooth),
-    speed: SPEED_STEPS.includes(v.speed as number) ? (v.speed as number) : d.speed,
-    labSpeed: SPEED_STEPS.includes(v.labSpeed as number) ? (v.labSpeed as number) : d.labSpeed,
+    speed: SPEED_STEPS.includes(v.speed as number)
+      ? (v.speed as number)
+      : d.speed,
+    labSpeed: SPEED_STEPS.includes(v.labSpeed as number)
+      ? (v.labSpeed as number)
+      : d.labSpeed,
     density: int(v.density, DENSITY_MIN, DENSITY_MAX, d.density),
     stickiness: int(v.stickiness, STICKINESS_MIN, STICKINESS_MAX, d.stickiness),
     diagonals: int(v.diagonals, DIAGONALS_MIN, DIAGONALS_MAX, d.diagonals),
     melt: int(v.melt, MELT_MIN, MELT_MAX, d.melt),
     gaps: int(v.gaps, GAPS_MIN, GAPS_MAX, d.gaps),
     // Older saves kept a width (`brushSize`), from before the in-between brushes.
-    brushStep: int(v.brushStep, BRUSH_MIN, BRUSH_MAX, typeof v.brushSize === 'number' ? stepForWidth(v.brushSize) : d.brushStep),
+    brushStep: int(
+      v.brushStep,
+      BRUSH_MIN,
+      BRUSH_MAX,
+      typeof v.brushSize === "number" ? stepForWidth(v.brushSize) : d.brushStep,
+    ),
     rotateColours: flag(v.rotateColours, d.rotateColours),
     railHidden: flag(v.railHidden, d.railHidden),
     stylePreview: oneOf(v.stylePreview, PREVIEWS, d.stylePreview),
