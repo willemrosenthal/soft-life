@@ -56,7 +56,7 @@ export function tick(): void {
 export async function nativeShare(url: string): Promise<boolean> {
   if (!isNative) return false;
   try {
-    await Share.share({ title: 'BloopLife pattern', url });
+    await Share.share({ title: 'Bloop Life pattern', url });
   } catch {
     // Closing the share sheet is not an error worth reporting.
   }

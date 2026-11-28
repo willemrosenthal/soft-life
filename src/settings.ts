@@ -95,7 +95,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
 const STYLES: readonly CellStyle[] = ["goo", "dots", "pixels"];
 const MODES: readonly ColourMode[] = ["colonies", "solo", "age"];
 const PREVIEWS: readonly StylePreview[] = ["shapes", "live"];
-// Still "softlife" from before the app was named BloopLife: renaming it would lose everyone's saves.
+// Still "softlife" from before the app was named Bloop Life: renaming it would lose everyone's saves.
 const KEY = "softlife:settings";
 
 /** Saved data may be from an older version or damaged: anything unusable falls back to its default. */

@@ -149,7 +149,7 @@ export interface SavedRule {
 }
 
 export const NAME_MAX = 32;
-// Still "softlife" from before the app was named BloopLife: renaming it would lose everyone's saves.
+// Still "softlife" from before the app was named Bloop Life: renaming it would lose everyone's saves.
 const KEY = 'softlife:rules';
 
 /** Saved data may be damaged or from an older version: keep the entries that still make sense. */

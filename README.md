@@ -1,4 +1,4 @@
-# BloopLife
+# Bloop Life
 
 Conway's Game of Life with cells that merge into soft blobs. An installable web app that works offline.
 
@@ -42,7 +42,7 @@ What's different in the app (`src/native.ts`):
 
 iPhone only, portrait. `ios/App/App/PrivacyInfo.xcprivacy` declares that nothing is collected. The privacy policy is `public/privacy.html`.
 
-The web version is hosted on Render at https://soft-life-nt63.onrender.com. Shared links from the app open there, and the privacy policy is at `/privacy.html`.
+The web version is hosted on Render at https://soft-life-nt63.onrender.com. Shared links from the app open there, and the privacy policy is at `/privacy.html` and the support page (for the App Store listing) at `/support.html`.
 
 ## How it's put together
 
