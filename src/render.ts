@@ -130,6 +130,27 @@ export class BoardRenderer {
   private pathsKey = '';
   private lastSize = new Float32Array(0);
   private lastColour = new Int8Array(0);
+  private dots: Path2D | null = null;
+  private dotsKey = '';
+
+  /** The faint dot at every cell centre. It only changes with the grid, so it's built once and kept. */
+  private gridDots(cols: number, rows: number, c: number, ox: number, oy: number): Path2D {
+    const key = `${cols} ${rows} ${c} ${ox} ${oy}`;
+    if (this.dots && key === this.dotsKey) return this.dots;
+    const dots = new Path2D();
+    const dr = Math.max(0.8, c * 0.06);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const cx = ox + (x + 0.5) * c;
+        const cy = oy + (y + 0.5) * c;
+        dots.moveTo(cx + dr, cy);
+        dots.arc(cx, cy, dr, 0, TAU);
+      }
+    }
+    this.dots = dots;
+    this.dotsKey = key;
+    return dots;
+  }
 
   /**
    * `t` runs 0 → 1 between generations: how far cells have grown in or melted away. `now` is the
@@ -143,34 +164,28 @@ export class BoardRenderer {
       this.colour = new Int8Array(n);
     }
     const { size, colour } = this;
+    // The same for every cell this frame, so worked out once.
+    const born = grow(t);
+    const dying = shrink(t);
+    const { mode } = look;
     for (let i = 0; i < n; i++) {
       const a = prev[i]!;
       const b = cur[i]!;
       let col: number;
       let age: number;
       if (a && b) { size[i] = 1; col = b; age = ages[i]!; }
-      else if (b) { size[i] = grow(t); col = b; age = 1; }
-      else if (a) { size[i] = shrink(t); col = a; age = prevAges[i]!; }
+      else if (b) { size[i] = born; col = b; age = 1; }
+      else if (a) { size[i] = dying; col = a; age = prevAges[i]!; }
       else { size[i] = 0; continue; }
-      colour[i] = look.mode === 'colonies' ? col - 1 : look.mode === 'solo' ? 0 : ageBucket(age);
+      colour[i] = mode === 'colonies' ? col - 1 : mode === 'solo' ? 0 : ageBucket(age);
     }
 
     const { width, height, cell: c, ox, oy } = view;
     ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, width, height);
 
-    const dots = new Path2D();
-    const dr = Math.max(0.8, c * 0.06);
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const cx = ox + (x + 0.5) * c;
-        const cy = oy + (y + 0.5) * c;
-        dots.moveTo(cx + dr, cy);
-        dots.arc(cx, cy, dr, 0, TAU);
-      }
-    }
     ctx.fillStyle = pal.dot;
-    ctx.fill(dots);
+    ctx.fill(this.gridDots(cols, rows, c, ox, oy));
 
     const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
     const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, diagonals: look.diagonals, wrap: look.wrap };

@@ -30,7 +30,7 @@ export interface SlimeLayer {
   wrap: boolean;
 }
 
-/** A full cell's radius, as a fraction of a cell. Shared with the other styles in render.ts. */
+/** A full cell's radius in the goo style, as a fraction of a cell. (Dots fill the whole cell, 0.5.) */
 export const RADIUS = 0.47;
 
 export const STICKINESS_MIN = 0;
@@ -43,7 +43,7 @@ export const STICKINESS_MAX = 100;
  */
 export const reachFor = (stickiness: number) => 0.75 + 0.005 * stickiness;
 
-/** A lone lump's edge is at RADIUS × size, the same circles the other styles draw, when the field's level is this. */
+/** A lone lump's edge is at RADIUS × size when the field's level is this. */
 export const thresholdFor = (reach: number) => (1 - (RADIUS / reach) ** 2) ** 3;
 
 /** How far the lump in the middle of a full 2×2 block reaches, in cells. */
