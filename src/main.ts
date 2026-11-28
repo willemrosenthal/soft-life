@@ -1434,7 +1434,7 @@ async function share(): Promise<void> {
   // Phones get the share sheet; elsewhere the link goes to the clipboard.
   if (matchMedia('(pointer: coarse)').matches && navigator.share) {
     try {
-      await navigator.share({ title: 'Softlife pattern', url });
+      await navigator.share({ title: 'BloopLife pattern', url });
     } catch {
       // Closing the share sheet is not an error worth reporting.
     }

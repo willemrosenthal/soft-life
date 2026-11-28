@@ -18,6 +18,7 @@ export interface CustomTheme {
 
 export const CELL_COUNT = 6;
 export const NAME_MAX = 24;
+// Still "softlife" from before the app was named BloopLife: renaming it would lose everyone's saves.
 const KEY = 'softlife:themes';
 /** How settings.palette names a custom theme: "custom:<id>". */
 const PREFIX = 'custom:';

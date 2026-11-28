@@ -1,6 +1,6 @@
 {
-  "name": "Softlife",
-  "short_name": "Softlife",
+  "name": "BloopLife",
+  "short_name": "BloopLife",
   "description": "Conway's Game of Life with cells that merge into soft blobs.",
   "start_url": "./",
   "scope": "./",

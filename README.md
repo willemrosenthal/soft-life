@@ -1,4 +1,4 @@
-# Softlife
+# BloopLife
 
 Conway's Game of Life with cells that merge into soft blobs. An installable web app that works offline.
 

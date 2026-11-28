@@ -1,6 +1,6 @@
 {
-  "appId": "com.willemrosenthal.softlife",
-  "appName": "Softlife",
+  "appId": "com.willemrosenthal.blooplife",
+  "appName": "BloopLife",
   "webDir": "dist",
   "backgroundColor": "#F3F5EF",
   "ios": {
