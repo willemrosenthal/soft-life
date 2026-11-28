@@ -130,27 +130,8 @@ export class BoardRenderer {
   private pathsKey = '';
   private lastSize = new Float32Array(0);
   private lastColour = new Int8Array(0);
-  private dots: Path2D | null = null;
-  private dotsKey = '';
-
-  /** The faint dot at every cell centre. It only changes with the grid, so it's built once and kept. */
-  private gridDots(cols: number, rows: number, c: number, ox: number, oy: number): Path2D {
-    const key = `${cols} ${rows} ${c} ${ox} ${oy}`;
-    if (this.dots && key === this.dotsKey) return this.dots;
-    const dots = new Path2D();
-    const dr = Math.max(0.8, c * 0.06);
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const cx = ox + (x + 0.5) * c;
-        const cy = oy + (y + 0.5) * c;
-        dots.moveTo(cx + dr, cy);
-        dots.arc(cx, cy, dr, 0, TAU);
-      }
-    }
-    this.dots = dots;
-    this.dotsKey = key;
-    return dots;
-  }
+  private grid: Path2D | null = null;
+  private gridKey = '';
 
   /**
    * `t` runs 0 → 1 between generations: how far cells have grown in or melted away. `now` is the
@@ -187,7 +168,7 @@ export class BoardRenderer {
     ctx.fillStyle = pal.dot;
     ctx.fill(this.gridDots(cols, rows, c, ox, oy));
 
-    const colours = look.mode === 'colonies' ? pal.cells : look.mode === 'solo' ? [pal.solo] : pal.age;
+    const colours = mode === 'colonies' ? pal.cells : mode === 'solo' ? [pal.solo] : pal.age;
     const layer: CellLayer = { cols, rows, cell: c, ox, oy, size, colour, colours, style: look.style, stickiness: look.stickiness, diagonals: look.diagonals, wrap: look.wrap };
     if (!this.drawMelt(ctx, layer, look, width, height)) this.drawFlat(ctx, layer);
 
@@ -231,6 +212,25 @@ export class BoardRenderer {
       this.lastColour.set(g.colour);
     }
     fillCells(ctx, this.paths, g);
+  }
+
+  /** The faint dot at every cell centre. It only changes with the grid, so it's built once and kept. */
+  private gridDots(cols: number, rows: number, c: number, ox: number, oy: number): Path2D {
+    const key = `${cols} ${rows} ${c} ${ox} ${oy}`;
+    if (this.grid && key === this.gridKey) return this.grid;
+    const dots = new Path2D();
+    const dr = Math.max(0.8, c * 0.06);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const cx = ox + (x + 0.5) * c;
+        const cy = oy + (y + 0.5) * c;
+        dots.moveTo(cx + dr, cy);
+        dots.arc(cx, cy, dr, 0, TAU);
+      }
+    }
+    this.grid = dots;
+    this.gridKey = key;
+    return dots;
   }
 }
 
