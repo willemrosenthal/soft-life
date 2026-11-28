@@ -66,7 +66,7 @@ export const DENSITY_MAX = 48;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   palette: 'meadow', style: 'goo', mode: 'colonies', rule: 'B3/S23',
-  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 0, melt: 75, gaps: 50, brushStep: 0, rotateColours: false, railHidden: false,
+  wrap: true, critters: true, critterAbundance: DEFAULT_ABUNDANCE, smooth: true, speed: 8, labSpeed: 10, density: 26, stickiness: 50, diagonals: 90, melt: 75, gaps: 50, brushStep: 0, rotateColours: false, railHidden: false,
   stylePreview: 'shapes', stylePreviewShown: false,
 };
 
