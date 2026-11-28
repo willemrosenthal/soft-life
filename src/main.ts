@@ -677,18 +677,32 @@ function buildLibrary(): void {
   drawThumbnails();
 }
 
+/**
+ * A library pattern as it should sit on this board. Most patterns are stored wider than tall, so on
+ * a portrait board (more rows than columns) those are turned a quarter turn clockwise to fit better.
+ * Life's rules don't care about orientation, so the pattern behaves the same either way.
+ */
+function orientedCells(cells: readonly string[]): readonly string[] {
+  const rows = cells.length;
+  const cols = Math.max(0, ...cells.map((r) => r.length));
+  if (life.rows <= life.cols || cols <= rows) return cells;
+  return Array.from({ length: cols }, (_, x) => Array.from({ length: rows }, (_, y) => cells[rows - 1 - y]![x] ?? '.').join(''));
+}
+
 /** Library patterns get a colony by position, so each card has its own colour. */
 const patternColony = (index: number) => (index % palette().cells.length) + 1;
 
 function drawThumbnails(): void {
+  // Portrait boards show patterns turned upright, so the thumbnails go upright too.
+  libGrid.classList.toggle('portrait', life.rows > life.cols);
   for (const card of libGrid.querySelectorAll<HTMLElement>('.card')) {
     const index = Number(card.dataset.pattern);
-    const cells = PATTERNS[index]!.cells;
+    const cells = orientedCells(PATTERNS[index]!.cells);
     const c = el<HTMLCanvasElement>('canvas', card);
     if (!c.clientWidth) continue;
     const { ctx: g, w, h } = fitSmallCanvas(c);
     const rows = cells.length;
-    const cols = cells[0]!.length;
+    const cols = Math.max(0, ...cells.map((r) => r.length));
     const cell = Math.min(w / (cols + 3), h / (rows + 3), 15);
     const size = new Float32Array(cols * rows);
     cells.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === 'O') size[y * cols + x] = 1; }));
@@ -715,7 +729,7 @@ function fitSmallCanvas(c: HTMLCanvasElement): { ctx: CanvasRenderingContext2D; 
 function loadPattern(index: number): void {
   const pattern = PATTERNS[index]!;
   const colony = patternColony(index);
-  life.place(pattern.cells, (ch) => (ch === 'O' ? colony : 0));
+  life.place(orientedCells(pattern.cells), (ch) => (ch === 'O' ? colony : 0));
   boardChanged();
   libDrawer.setOpen(false);
   toast(`Loaded ${pattern.name}`);
