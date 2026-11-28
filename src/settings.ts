@@ -78,7 +78,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   critters: true,
   critterAbundance: DEFAULT_ABUNDANCE,
   smooth: true,
-  speed: 5,
+  speed: 4,
   labSpeed: 10,
   density: 18,
   stickiness: 45,

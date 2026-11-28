@@ -1,4 +1,4 @@
-import type { Life } from './life';
+import type { Life } from "./life";
 
 /**
  * Critters: some long-lived cells open an eye, and the eye has a little life of its own. It glances
@@ -13,7 +13,7 @@ import type { Life } from './life';
 const TAU = Math.PI * 2;
 export const ABUNDANCE_MIN = 0;
 export const ABUNDANCE_MAX = 100;
-export const DEFAULT_ABUNDANCE = 60;
+export const DEFAULT_ABUNDANCE = 70;
 
 export interface CritterOdds {
   /** A cell must have been alive this many generations before it can open an eye. */
@@ -70,7 +70,15 @@ export interface Traits {
   blink: number;
 }
 
-const CLASSIC: Traits = { size: 1, pupil: 1, lidRest: 0, iris: false, shy: false, saccade: 1, blink: 1 };
+const CLASSIC: Traits = {
+  size: 1,
+  pupil: 1,
+  lidRest: 0,
+  iris: false,
+  shy: false,
+  saccade: 1,
+  blink: 1,
+};
 export const TRAITS = {
   classic: CLASSIC,
   wide: { ...CLASSIC, size: 1.22, pupil: 1.18, saccade: 0.8 },
@@ -85,7 +93,17 @@ export type TraitName = keyof typeof TRAITS;
 
 function traitsAt(x: number, y: number): TraitName {
   const r = positionHash(x + 31, y + 17);
-  return r < 0.38 ? 'classic' : r < 0.52 ? 'wide' : r < 0.66 ? 'beady' : r < 0.78 ? 'heavy' : r < 0.9 ? 'tinted' : 'shy';
+  return r < 0.38
+    ? "classic"
+    : r < 0.52
+      ? "wide"
+      : r < 0.66
+        ? "beady"
+        : r < 0.78
+          ? "heavy"
+          : r < 0.9
+            ? "tinted"
+            : "shy";
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -94,7 +112,7 @@ function traitsAt(x: number, y: number): TraitName {
 export interface Spot {
   /** Stable id: the cell index for a single eye, minus (index + 1) of the top-left cell for a pair. */
   key: number;
-  kind: 'single' | 'pair';
+  kind: "single" | "pair";
   /** The cells it sits on. */
   cells: number[];
   /** Centre, in grid units (cell (0, 0) spans 0..1). */
@@ -107,7 +125,11 @@ export interface Spot {
  * Which cells have a critter right now. Fixed by position, so eyes don't flicker. Pairs only in the
  * goo style, where a block is drawn as one solid blob.
  */
-export function findSpots(life: Life, pairs: boolean, odds: CritterOdds = critterOdds(DEFAULT_ABUNDANCE)): Spot[] {
+export function findSpots(
+  life: Life,
+  pairs: boolean,
+  odds: CritterOdds = critterOdds(DEFAULT_ABUNDANCE),
+): Spot[] {
   const { cols, rows, cur, prev, ages } = life;
   const ok = (i: number) => cur[i]! > 0 && prev[i]! > 0 && ages[i]! >= odds.age;
   const spots: Spot[] = [];
@@ -119,9 +141,17 @@ export function findSpots(life: Life, pairs: boolean, odds: CritterOdds = critte
         // Cheap checks first: this runs every frame, over every cell.
         if (!ok(i) || used[i] || positionHash(x, y + 99) >= odds.pair) continue;
         const cells = [i, i + 1, i + cols, i + cols + 1];
-        if (!cells.every((j) => ok(j) && !used[j] && cur[j] === cur[i])) continue;
+        if (!cells.every((j) => ok(j) && !used[j] && cur[j] === cur[i]))
+          continue;
         for (const j of cells) used[j] = 1;
-        spots.push({ key: -(i + 1), kind: 'pair', cells, x: x + 1, y: y + 1, traits: 'pair' });
+        spots.push({
+          key: -(i + 1),
+          kind: "pair",
+          cells,
+          x: x + 1,
+          y: y + 1,
+          traits: "pair",
+        });
       }
     }
   }
@@ -129,7 +159,14 @@ export function findSpots(life: Life, pairs: boolean, odds: CritterOdds = critte
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
       if (used[i] || !ok(i) || positionHash(x, y) >= odds.single) continue;
-      spots.push({ key: i, kind: 'single', cells: [i], x: x + 0.5, y: y + 0.5, traits: traitsAt(x, y) });
+      spots.push({
+        key: i,
+        kind: "single",
+        cells: [i],
+        x: x + 0.5,
+        y: y + 0.5,
+        traits: traitsAt(x, y),
+      });
     }
   }
   return spots;
@@ -147,16 +184,30 @@ export function creaseColour(hex: string): string {
   const cached = creaseCache.get(hex);
   if (cached) return cached;
   const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0, s = 0, l = (max + min) / 2;
+  const r = (n >> 16) / 255,
+    g = ((n >> 8) & 255) / 255,
+    b = (n & 255) / 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b),
+    d = max - min;
+  let h = 0,
+    s = 0,
+    l = (max + min) / 2;
   if (d) {
     s = d / (1 - Math.abs(2 * l - 1));
-    h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h =
+      max === r
+        ? ((g - b) / d) % 6
+        : max === g
+          ? (b - r) / d + 2
+          : (r - g) / d + 4;
     h = (h * 60 + 360) % 360;
   }
   if (l < 0.22) l = Math.min(1, l + 0.26);
-  else { l = Math.max(0.08, l * 0.62); s = Math.min(1, s * 1.08); }
+  else {
+    l = Math.max(0.08, l * 0.62);
+    s = Math.min(1, s * 1.08);
+  }
   const out = `hsl(${h.toFixed(0)} ${(s * 100).toFixed(1)}% ${(l * 100).toFixed(1)}%)`;
   creaseCache.set(hex, out);
   return out;
@@ -167,9 +218,15 @@ export function creaseColour(hex: string): string {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const easeOut = (u: number) => { const v = 1 - clamp(u, 0, 1); return 1 - v * v * v; };
+const easeOut = (u: number) => {
+  const v = 1 - clamp(u, 0, 1);
+  return 1 - v * v * v;
+};
 
-export interface Vec { x: number; y: number }
+export interface Vec {
+  x: number;
+  y: number;
+}
 export interface EyeInput {
   /** Something to look at, as a direction (length up to 1). */
   attention?: Vec | null;
@@ -181,30 +238,46 @@ export interface EyeInput {
   calm?: boolean;
 }
 
-type Mood = 'idle' | 'startled' | 'happy';
+type Mood = "idle" | "startled" | "happy";
 
 export class Eye {
   readonly t: Traits;
   /** Gaze (unit disc), its velocity and target. */
-  private gx = 0; private gy = 0; private vx = 0; private vy = 0; private tx = 0; private ty = 0;
+  private gx = 0;
+  private gy = 0;
+  private vx = 0;
+  private vy = 0;
+  private tx = 0;
+  private ty = 0;
   private nextSaccade = rand(0.2, 1.2);
   private nextBlink = rand(0.8, 4);
-  private blinkT = -1; private blinkDur = 0.17; private pendingDouble = false; private gap = 0;
+  private blinkT = -1;
+  private blinkDur = 0.17;
+  private pendingDouble = false;
+  private gap = 0;
   private blinkAmt = 0;
   /** Opening when it first appears: a spring that overshoots a little. */
-  private open = 0; private openV = 0;
-  private lidU = 1; private lidL = 0;
-  private widen = 0; private dilate = 1;
-  private mood: Mood = 'idle'; private moodT = 0;
+  private open = 0;
+  private openV = 0;
+  private lidU = 1;
+  private lidL = 0;
+  private widen = 0;
+  private dilate = 1;
+  private mood: Mood = "idle";
+  private moodT = 0;
   asleep = false;
   sleepiness = 0;
   private time = 0;
   private readonly phase = Math.random() * 10;
 
-  constructor(traits: Traits) { this.t = traits; }
+  constructor(traits: Traits) {
+    this.t = traits;
+  }
 
   /** Seconds this eye has been running. */
-  get clock(): number { return this.time; }
+  get clock(): number {
+    return this.time;
+  }
 
   blink(dur = 0.17, double = false): void {
     if (this.blinkT >= 0 || this.gap > 0) return;
@@ -222,14 +295,14 @@ export class Eye {
   }
 
   startle(dx = 0, dy = 0): void {
-    this.mood = 'startled';
+    this.mood = "startled";
     this.moodT = 0.9;
     this.lookAt(dx, dy, 1.2);
   }
 
   delight(): void {
-    if (this.mood === 'startled') return;
-    this.mood = 'happy';
+    if (this.mood === "startled") return;
+    this.mood = "happy";
     this.moodT = 1.1;
   }
 
@@ -250,7 +323,7 @@ export class Eye {
 
     if (this.moodT > 0) {
       this.moodT -= dt;
-      if (this.moodT <= 0) this.mood = 'idle';
+      if (this.moodT <= 0) this.mood = "idle";
     }
 
     let att = input.attention ?? null;
@@ -277,7 +350,10 @@ export class Eye {
     this.gx += this.vx * dt;
     this.gy += this.vy * dt;
     const gm = Math.hypot(this.gx, this.gy);
-    if (gm > 1) { this.gx /= gm; this.gy /= gm; }
+    if (gm > 1) {
+      this.gx /= gm;
+      this.gy /= gm;
+    }
 
     if (!this.asleep) {
       this.nextBlink -= dt * T.blink;
@@ -291,16 +367,24 @@ export class Eye {
 
     let upper = T.lidRest + this.sleepiness * 0.55;
     let lower = 0;
-    if (this.mood === 'happy' || input.squint) { upper = 0.18; lower = 0.48; }
-    if (this.mood === 'startled') upper = 0;
-    if (this.asleep) { upper = 1; lower = 0; }
+    if (this.mood === "happy" || input.squint) {
+      upper = 0.18;
+      lower = 0.48;
+    }
+    if (this.mood === "startled") upper = 0;
+    if (this.asleep) {
+      upper = 1;
+      lower = 0;
+    }
     const ls = 1 - Math.exp(-dt * (this.asleep ? 4 : 18));
     this.lidU += (upper - this.lidU) * ls;
     this.lidL += (lower - this.lidL) * ls;
 
-    const wide = this.mood === 'startled' ? 1 : 0;
+    const wide = this.mood === "startled" ? 1 : 0;
     this.widen += (wide - this.widen) * (1 - Math.exp(-dt * (wide ? 30 : 6)));
-    const pupil = (this.mood === 'startled' ? 0.62 : this.mood === 'happy' ? 1.15 : 1) * (1 + 0.05 * Math.sin(this.time * 0.9 + this.phase));
+    const pupil =
+      (this.mood === "startled" ? 0.62 : this.mood === "happy" ? 1.15 : 1) *
+      (1 + 0.05 * Math.sin(this.time * 0.9 + this.phase));
     this.dilate += (pupil - this.dilate) * (1 - Math.exp(-dt * 8));
   }
 
@@ -327,15 +411,26 @@ export class Eye {
     if (this.blinkT >= 0) {
       this.blinkT += dt;
       const u = this.blinkT / this.blinkDur;
-      this.blinkAmt = u < 0.38 ? Math.sin((u / 0.38) * Math.PI / 2) : u < 0.48 ? 1 : 1 - easeOut((u - 0.48) / 0.52);
+      this.blinkAmt =
+        u < 0.38
+          ? Math.sin(((u / 0.38) * Math.PI) / 2)
+          : u < 0.48
+            ? 1
+            : 1 - easeOut((u - 0.48) / 0.52);
       if (u >= 1) {
         this.blinkT = -1;
         this.blinkAmt = 0;
-        if (this.pendingDouble) { this.pendingDouble = false; this.gap = 0.07; }
+        if (this.pendingDouble) {
+          this.pendingDouble = false;
+          this.gap = 0.07;
+        }
       }
     } else if (this.gap > 0) {
       this.gap -= dt;
-      if (this.gap <= 0) { this.blinkT = 0; this.blinkDur = 0.15; }
+      if (this.gap <= 0) {
+        this.blinkT = 0;
+        this.blinkDur = 0.15;
+      }
     }
   }
 
@@ -343,21 +438,41 @@ export class Eye {
    * Draw the eye centred at (cx, cy) on a cell of size `c`, in a cell coloured `skin`. `k` scales it
    * (the cell melting away) and `extraLid` closes it further (dying, or a wink).
    */
-  draw(ctx: CanvasRenderingContext2D, cx: number, cy: number, c: number, skin: string, iris: string, k = 1, extraLid = 0): void {
+  draw(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    c: number,
+    skin: string,
+    iris: string,
+    k = 1,
+    extraLid = 0,
+  ): void {
     const T = this.t;
-    const sc = T.size * k * (1 + 0.14 * this.widen) * (this.asleep ? 1 + 0.025 * Math.sin(this.time * 2.2 + this.phase) : 1);
+    const sc =
+      T.size *
+      k *
+      (1 + 0.14 * this.widen) *
+      (this.asleep ? 1 + 0.025 * Math.sin(this.time * 2.2 + this.phase) : 1);
     if (sc <= 0.02) return;
     const R = Math.min(c * EYE * sc, c * EYE_MAX * k * (1 + 0.06 * this.widen));
     const Rw = R * WHITE;
-    const Rp = Math.min(c * PUPIL * sc * T.pupil * this.dilate, Rw * (T.iris ? 0.44 : 0.62));
-    const lidU = clamp(Math.max(this.lidU, this.blinkAmt, 1 - this.open, extraLid), 0, 1);
+    const Rp = Math.min(
+      c * PUPIL * sc * T.pupil * this.dilate,
+      Rw * (T.iris ? 0.44 : 0.62),
+    );
+    const lidU = clamp(
+      Math.max(this.lidU, this.blinkAmt, 1 - this.open, extraLid),
+      0,
+      1,
+    );
     const lidL = clamp(this.lidL * (1 - this.blinkAmt), 0, 1 - lidU);
 
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(1, 1 - 0.07 * this.blinkAmt);
 
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = "#FFFFFF";
     ctx.beginPath();
     ctx.arc(0, 0, Rw, 0, TAU);
     ctx.fill();
@@ -370,7 +485,7 @@ export class Eye {
       ctx.arc(px, py, Rp * 1.7, 0, TAU);
       ctx.fill();
     }
-    ctx.fillStyle = '#161616';
+    ctx.fillStyle = "#161616";
     ctx.beginPath();
     ctx.arc(px, py, Rp, 0, TAU);
     ctx.fill();
@@ -387,7 +502,9 @@ export class Eye {
         const yc = -R + 2 * R * lidU;
         const sag = R * 0.5 * Math.sin(Math.PI * lidU);
         ctx.beginPath();
-        ctx.moveTo(-E, -E); ctx.lineTo(E, -E); ctx.lineTo(E, yc - sag);
+        ctx.moveTo(-E, -E);
+        ctx.lineTo(E, -E);
+        ctx.lineTo(E, yc - sag);
         ctx.quadraticCurveTo(0, yc + sag, -E, yc - sag);
         ctx.closePath();
         ctx.fill();
@@ -396,7 +513,9 @@ export class Eye {
         const yc = R - 2 * R * lidL;
         const sag = R * 0.55 * Math.sin(Math.PI * lidL);
         ctx.beginPath();
-        ctx.moveTo(-E, E); ctx.lineTo(E, E); ctx.lineTo(E, yc + sag);
+        ctx.moveTo(-E, E);
+        ctx.lineTo(E, E);
+        ctx.lineTo(E, yc + sag);
         ctx.quadraticCurveTo(0, yc - sag, -E, yc + sag);
         ctx.closePath();
         ctx.fill();
@@ -408,7 +527,7 @@ export class Eye {
         ctx.globalAlpha = clamp((shut - 0.9) * 10, 0, 1) * 0.85;
         ctx.strokeStyle = creaseColour(skin);
         ctx.lineWidth = Math.max(1, c * 0.035 * k);
-        ctx.lineCap = 'round';
+        ctx.lineCap = "round";
         ctx.beginPath();
         if (lidL > 0.2) {
           const yy = R - 2 * R * lidL - R * 0.1;
@@ -452,10 +571,20 @@ function rouse(cr: Critter, seconds: number): void {
   cr.awakeUntil = Math.max(cr.awakeUntil, cr.eye.clock + seconds);
 }
 
-interface Z { x: number; y: number; c: number; t: number; dx: number }
+interface Z {
+  x: number;
+  y: number;
+  c: number;
+  t: number;
+  dx: number;
+}
 
 /** Where the grid sits, in canvas units. */
-export interface Placement { cell: number; ox: number; oy: number }
+export interface Placement {
+  cell: number;
+  ox: number;
+  oy: number;
+}
 
 export interface CritterFrame {
   life: Life;
@@ -504,21 +633,29 @@ export class Critters {
   poke(x: number, y: number): void {
     if (this.calm) return;
     for (const cr of this.critters.values()) {
-      const dx = x - cr.spot.x, dy = y - cr.spot.y, d = Math.hypot(dx, dy);
+      const dx = x - cr.spot.x,
+        dy = y - cr.spot.y,
+        d = Math.hypot(dx, dy);
       if (d < 5) rouse(cr, 6);
       if (d < 2.6) cr.eye.startle(dx, dy);
     }
   }
 
   draw(ctx: CanvasRenderingContext2D, f: CritterFrame): void {
-    const dt = this.lastNow < 0 ? 0 : clamp((f.now - this.lastNow) / 1000, 0, 0.05);
+    const dt =
+      this.lastNow < 0 ? 0 : clamp((f.now - this.lastNow) / 1000, 0, 0.05);
     this.lastNow = f.now;
     const { life, place } = f;
     const { cur, ages } = life;
     const changed = life.gen !== this.lastGen;
     this.lastGen = life.gen;
 
-    this.sync(life, f.pairs, critterOdds(f.abundance ?? DEFAULT_ABUNDANCE), changed);
+    this.sync(
+      life,
+      f.pairs,
+      critterOdds(f.abundance ?? DEFAULT_ABUNDANCE),
+      changed,
+    );
     if (changed) this.react(life);
 
     const { cell: c, ox, oy } = place;
@@ -532,7 +669,9 @@ export class Critters {
         let attention: Vec | null = null;
         let squint = false;
         if (this.pointer && !this.calm) {
-          const dx = this.pointer.x - spot.x, dy = this.pointer.y - spot.y, d = Math.hypot(dx, dy);
+          const dx = this.pointer.x - spot.x,
+            dy = this.pointer.y - spot.y,
+            d = Math.hypot(dx, dy);
           if (d < 7) {
             attention = { x: dx / Math.max(d, 1.8), y: dy / Math.max(d, 1.8) };
             rouse(cr, 5);
@@ -541,7 +680,8 @@ export class Critters {
         }
         const awake = eye.clock < cr.awakeUntil;
         const over = (ages[lead] ?? 0) - cr.sleepAge;
-        eye.sleepiness = awake || over <= -24 ? 0 : clamp(over / 60 + 0.4, 0, 1);
+        eye.sleepiness =
+          awake || over <= -24 ? 0 : clamp(over / 60 + 0.4, 0, 1);
         if (!awake && over > 40) eye.asleep = true;
         eye.update(dt, { attention, squint, peer: cr.peer, calm: this.calm });
       } else {
@@ -559,11 +699,17 @@ export class Critters {
         cr.zTimer -= dt;
         if (cr.zTimer < 0) {
           cr.zTimer = rand(1.8, 3);
-          this.zs.push({ x: cx + c * 0.2, y: cy - c * 0.35, c, t: 0, dx: rand(0.2, 0.45) });
+          this.zs.push({
+            x: cx + c * 0.2,
+            y: cy - c * 0.35,
+            c,
+            t: 0,
+            dx: rand(0.2, 0.45),
+          });
         }
       }
 
-      if (spot.kind === 'pair') {
+      if (spot.kind === "pair") {
         let wink = 0;
         if (!this.calm && !eye.asleep && !dying) {
           cr.winkT -= dt;
@@ -572,8 +718,26 @@ export class Critters {
             if (cr.winkT < -0.35) cr.winkT = rand(6, 14);
           }
         }
-        eye.draw(ctx, cx - c * 0.5, cy - c * 0.08, c, skin, f.iris, k, extraLid);
-        eye.draw(ctx, cx + c * 0.5, cy - c * 0.08, c, skin, f.iris, k, Math.max(extraLid, wink));
+        eye.draw(
+          ctx,
+          cx - c * 0.5,
+          cy - c * 0.08,
+          c,
+          skin,
+          f.iris,
+          k,
+          extraLid,
+        );
+        eye.draw(
+          ctx,
+          cx + c * 0.5,
+          cy - c * 0.08,
+          c,
+          skin,
+          f.iris,
+          k,
+          Math.max(extraLid, wink),
+        );
       } else {
         eye.draw(ctx, cx, cy, c, skin, f.iris, k, extraLid);
       }
@@ -585,14 +749,23 @@ export class Critters {
    * Match the critters to the board. New spots open an eye; a critter whose cell is melting away
    * stays (and closes) until the melt is done; anything else that no longer qualifies goes.
    */
-  private sync(life: Life, pairs: boolean, odds: CritterOdds, changed: boolean): void {
+  private sync(
+    life: Life,
+    pairs: boolean,
+    odds: CritterOdds,
+    changed: boolean,
+  ): void {
     const spots = findSpots(life, pairs, odds);
     const seen = new Set<number>();
     for (const spot of spots) {
       seen.add(spot.key);
       const have = this.critters.get(spot.key);
-      if (have) { have.spot = spot; continue; }
-      const gx = Math.floor(spot.x), gy = Math.floor(spot.y);
+      if (have) {
+        have.spot = spot;
+        continue;
+      }
+      const gx = Math.floor(spot.x),
+        gy = Math.floor(spot.y);
       this.critters.set(spot.key, {
         spot,
         eye: new Eye(TRAITS[spot.traits]),
@@ -607,7 +780,9 @@ export class Critters {
     for (const [key, cr] of this.critters) {
       if (seen.has(key)) continue;
       // Out-of-range cells (after a resize) read as undefined, so those critters go too.
-      const melting = cr.spot.cells.every((i) => prev[i]) && cr.spot.cells.some((i) => !cur[i]);
+      const melting =
+        cr.spot.cells.every((i) => prev[i]) &&
+        cr.spot.cells.some((i) => !cur[i]);
       if (!melting) this.critters.delete(key);
     }
     if (changed) this.findPeers();
@@ -620,8 +795,13 @@ export class Critters {
       let bestD = 9;
       for (const o of list) {
         if (o === cr) continue;
-        const dx = o.spot.x - cr.spot.x, dy = o.spot.y - cr.spot.y, d = Math.hypot(dx, dy);
-        if (d < bestD) { bestD = d; best = { x: dx / d, y: dy / d }; }
+        const dx = o.spot.x - cr.spot.x,
+          dy = o.spot.y - cr.spot.y,
+          d = Math.hypot(dx, dy);
+        if (d < bestD) {
+          bestD = d;
+          best = { x: dx / d, y: dy / d };
+        }
       }
       cr.peer = best;
     }
@@ -634,24 +814,35 @@ export class Critters {
     const births: Vec[] = [];
     const deaths: Vec[] = [];
     for (let i = 0; i < cur.length; i++) {
-      if (cur[i] && !prev[i]) births.push({ x: (i % cols) + 0.5, y: Math.floor(i / cols) + 0.5 });
-      else if (prev[i] && !cur[i]) deaths.push({ x: (i % cols) + 0.5, y: Math.floor(i / cols) + 0.5 });
+      if (cur[i] && !prev[i])
+        births.push({ x: (i % cols) + 0.5, y: Math.floor(i / cols) + 0.5 });
+      else if (prev[i] && !cur[i])
+        deaths.push({ x: (i % cols) + 0.5, y: Math.floor(i / cols) + 0.5 });
     }
     if (!births.length && !deaths.length) return;
     for (const cr of this.critters.values()) {
       const { eye, spot } = cr;
       if (!spot.cells.every((i) => cur[i])) continue;
-      const reach = spot.kind === 'pair' ? 2.1 : 1.6;
+      const reach = spot.kind === "pair" ? 2.1 : 1.6;
       let startle: Vec | null = null;
       for (const d of deaths) {
-        const dx = d.x - spot.x, dy = d.y - spot.y;
-        if (Math.hypot(dx, dy) < reach) { startle = { x: dx, y: dy }; break; }
+        const dx = d.x - spot.x,
+          dy = d.y - spot.y;
+        if (Math.hypot(dx, dy) < reach) {
+          startle = { x: dx, y: dy };
+          break;
+        }
       }
       let near: Vec | null = null;
       let nd = Infinity;
       for (const b of births) {
-        const dx = b.x - spot.x, dy = b.y - spot.y, d = Math.hypot(dx, dy);
-        if (d < nd) { nd = d; near = { x: dx, y: dy }; }
+        const dx = b.x - spot.x,
+          dy = b.y - spot.y,
+          d = Math.hypot(dx, dy);
+        if (d < nd) {
+          nd = d;
+          near = { x: dx, y: dy };
+        }
       }
       if (startle && Math.random() < 0.7) {
         rouse(cr, 4);
@@ -668,14 +859,18 @@ export class Critters {
     if (!this.zs.length) return;
     this.zs = this.zs.filter((z) => (z.t += dt) < 2.2);
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.fillStyle = ink;
     for (const z of this.zs) {
       const u = z.t / 2.2;
       ctx.globalAlpha = Math.sin(u * Math.PI) * 0.7;
       ctx.font = `800 ${Math.round(z.c * (0.32 + u * 0.22))}px "Bricolage Grotesque", system-ui, sans-serif`;
-      ctx.fillText('z', z.x + z.c * z.dx * u * 1.6 + Math.sin(u * 7) * z.c * 0.06, z.y - z.c * u * 1.3);
+      ctx.fillText(
+        "z",
+        z.x + z.c * z.dx * u * 1.6 + Math.sin(u * 7) * z.c * 0.06,
+        z.y - z.c * u * 1.3,
+      );
     }
     ctx.restore();
   }

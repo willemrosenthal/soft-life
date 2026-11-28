@@ -1,0 +1,59 @@
+{
+  "mode": "plain",
+  "outputDir": "out",
+  "targets": [
+    "iphone-1206x2622",
+    "duo-2007x2853"
+  ],
+  "screens": [
+    {
+      "name": "candy",
+      "raw": {
+        "iphone": "raw/iphone/01-candy.png",
+        "duo": "raw/duo/01-candy.png"
+      }
+    },
+    {
+      "name": "patterns",
+      "raw": {
+        "iphone": "raw/iphone/02-patterns.png",
+        "duo": "raw/duo/02-patterns.png"
+      }
+    },
+    {
+      "name": "meadow",
+      "raw": {
+        "iphone": "raw/iphone/03-meadow.png",
+        "duo": "raw/duo/03-meadow.png"
+      }
+    },
+    {
+      "name": "night",
+      "raw": {
+        "iphone": "raw/iphone/04-night.png",
+        "duo": "raw/duo/04-night.png"
+      }
+    },
+    {
+      "name": "themes",
+      "raw": {
+        "iphone": "raw/iphone/05-themes.png",
+        "duo": "raw/duo/05-themes.png"
+      }
+    },
+    {
+      "name": "candy-2",
+      "raw": {
+        "iphone": "raw/iphone/06-candy-2.png",
+        "duo": "raw/duo/06-candy-2.png"
+      }
+    },
+    {
+      "name": "rule-lab",
+      "raw": {
+        "iphone": "raw/iphone/07-rule-lab.png",
+        "duo": "raw/duo/07-rule-lab.png"
+      }
+    }
+  ]
+}
