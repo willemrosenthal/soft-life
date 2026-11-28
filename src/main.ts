@@ -15,7 +15,7 @@ import {
   CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, surpriseTheme, hardToSee, isDark, isHex, loadThemes, nextThemeName, resolvePalette, saveThemes, standOut, themeKey,
   type CustomTheme,
 } from './themes';
-import { CATEGORY_INFO, PATTERNS, type PatternCategory } from './patterns';
+import { CATEGORY_INFO, LIFE, PATTERNS, type PatternCategory } from './patterns';
 import { BoardRenderer, drawCells, type View } from './render';
 import { MiniBoard } from './miniboard';
 import {
@@ -334,7 +334,11 @@ const themeDrawer = stack.add('theme', new Drawer(themePanel, true, (open) => {
 }));
 
 railTab.addEventListener('click', () => rail.setOpen(true));
-libButton.addEventListener('click', () => stack.openModal(libDrawer));
+libButton.addEventListener('click', () => {
+  followBoardRule();
+  buildLibrary();
+  stack.openModal(libDrawer);
+});
 setButton.addEventListener('click', () => stack.openModal(setDrawer));
 for (const [panel, drawer] of [[libPanel, libDrawer], [setPanel, setDrawer], [labPanel, labDrawer], [themePanel, themeDrawer]] as const) {
   panel.addEventListener('click', (e) => {
@@ -662,30 +666,64 @@ swatchBox.addEventListener('click', (e) => {
 
 const libGrid = el('#lib');
 const libSearch = el<HTMLInputElement>('#q');
+const libRules = el('#libRules');
 let category: PatternCategory | 'all' = 'all';
 
+/** The rules the library has patterns for, with their names from the Rule list. */
+const LIBRARY_RULES = PRESETS.filter((p) => PATTERNS.some((pattern) => pattern.rules.includes(p.rule)));
+/** Which rule's patterns are showing. Follows the board's rule when the library opens, if it has patterns for it. */
+let libRule = LIFE;
+
+const libRuleName = (code: string) => LIBRARY_RULES.find((r) => r.rule === code)?.name ?? code;
+
+for (const r of LIBRARY_RULES) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.dataset.rule = r.rule;
+  b.textContent = r.name;
+  libRules.append(b);
+}
+
+/** Show the board's rule in the library when there are patterns for it; otherwise keep the last one picked. */
+function followBoardRule(): void {
+  if (LIBRARY_RULES.some((r) => r.rule === settings.rule)) libRule = settings.rule;
+}
+
 function buildLibrary(): void {
+  for (const b of libRules.querySelectorAll<HTMLElement>('[data-rule]')) b.setAttribute('aria-pressed', String(b.dataset.rule === libRule));
+  const note = el('#libRuleNote');
+  note.hidden = libRule === settings.rule;
+  note.textContent = `The board is running ${ruleName(settings.rule, savedRules) ?? settings.rule}. Loading a pattern marked “Switches” changes it to ${libRuleName(libRule)}.`;
+
+  const forRule = PATTERNS.map((p, index) => ({ p, index })).filter(({ p }) => p.rules.includes(libRule));
+  // Only offer the categories this rule has patterns in; fall back to All if the picked one has none.
+  const cats = new Set(forRule.map(({ p }) => p.category));
+  for (const chip of chips.querySelectorAll<HTMLElement>('[data-cat]')) chip.hidden = chip.dataset.cat !== 'all' && !cats.has(chip.dataset.cat as PatternCategory);
+  if (category !== 'all' && !cats.has(category)) pickCategory('all');
+
   const q = libSearch.value.trim().toLowerCase();
-  const shown = PATTERNS
-    .map((p, index) => ({ p, index }))
+  const shown = forRule
     .filter(({ p }) => (category === 'all' || p.category === category) && (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
   libGrid.innerHTML = shown
-    .map(({ p, index }) => `<button type="button" class="card" data-pattern="${index}"><canvas aria-hidden="true"></canvas><div><b>${p.name}</b><small>${p.category} · ${p.note}</small></div></button>`)
+    .map(({ p, index }) => `<button type="button" class="card" data-pattern="${index}"><canvas aria-hidden="true"></canvas><div><b>${p.name}</b><small>${p.category} · ${p.note}</small>`
+      + `${p.rules.includes(settings.rule) ? '' : `<small class="card-switch">Switches to ${escapeHtml(libRuleName(libRule))}</small>`}</div></button>`)
     .join('');
-  el('#libCount').textContent = `${shown.length} of ${PATTERNS.length}`;
+  el('#libCount').textContent = `${shown.length} of ${forRule.length}`;
   el('#libEmpty').hidden = shown.length > 0;
   drawThumbnails();
 }
 
 /**
- * A library pattern as it should sit on this board. Most patterns are stored wider than tall, so on
- * a portrait board (more rows than columns) those are turned a quarter turn clockwise to fit better.
- * Life's rules don't care about orientation, so the pattern behaves the same either way.
+ * A library pattern as it should sit on this board: turned a quarter turn clockwise when its long
+ * side runs the other way to the board's (a wide pattern on a portrait board, or a tall one on a
+ * landscape board), so it fits better. Life-like rules don't care about orientation, so the pattern
+ * behaves the same either way.
  */
 function orientedCells(cells: readonly string[]): readonly string[] {
   const rows = cells.length;
   const cols = Math.max(0, ...cells.map((r) => r.length));
-  if (life.rows <= life.cols || cols <= rows) return cells;
+  const boardTall = life.rows > life.cols;
+  if (cols === rows || boardTall === rows > cols) return cells;
   return Array.from({ length: cols }, (_, x) => Array.from({ length: rows }, (_, y) => cells[rows - 1 - y]![x] ?? '.').join(''));
 }
 
@@ -729,10 +767,13 @@ function fitSmallCanvas(c: HTMLCanvasElement): { ctx: CanvasRenderingContext2D; 
 function loadPattern(index: number): void {
   const pattern = PATTERNS[index]!;
   const colony = patternColony(index);
+  // A pattern only does its thing under its own rule, so loading it switches the board over if needed.
+  const switched = !pattern.rules.includes(settings.rule);
+  if (switched) setBoardRule(libRule);
   life.place(orientedCells(pattern.cells), (ch) => (ch === 'O' ? colony : 0));
   boardChanged();
   libDrawer.setOpen(false);
-  toast(`Loaded ${pattern.name}`);
+  toast(switched ? `Loaded ${pattern.name} and switched to ${libRuleName(libRule)}` : `Loaded ${pattern.name}`);
 }
 
 libSearch.addEventListener('input', buildLibrary);
@@ -741,14 +782,24 @@ libGrid.addEventListener('click', (e) => {
   if (card) loadPattern(Number(card.dataset.pattern));
 });
 const chips = el('#chips');
+function pickCategory(cat: PatternCategory | 'all'): void {
+  category = cat;
+  for (const c of chips.querySelectorAll<HTMLElement>('[data-cat]')) c.setAttribute('aria-pressed', String(c.dataset.cat === cat));
+  const info = el('#catInfo');
+  info.textContent = cat === 'all' ? '' : CATEGORY_INFO[cat];
+  info.hidden = cat === 'all';
+}
+
 chips.addEventListener('click', (e) => {
   const chip = (e.target as Element).closest<HTMLElement>('[data-cat]');
   if (!chip) return;
-  category = chip.dataset.cat as PatternCategory | 'all';
-  for (const c of chips.querySelectorAll('[data-cat]')) c.setAttribute('aria-pressed', String(c === chip));
-  const info = el('#catInfo');
-  info.textContent = category === 'all' ? '' : CATEGORY_INFO[category];
-  info.hidden = category === 'all';
+  pickCategory(chip.dataset.cat as PatternCategory | 'all');
+  buildLibrary();
+});
+libRules.addEventListener('click', (e) => {
+  const b = (e.target as Element).closest<HTMLElement>('[data-rule]');
+  if (!b || b.dataset.rule === libRule) return;
+  libRule = b.dataset.rule!;
   buildLibrary();
 });
 
@@ -1486,6 +1537,7 @@ document.addEventListener('click', (e) => {
 
 applyTheme();
 setBoardRule(settings.rule);
+followBoardRule();
 buildLibrary();
 syncSize();
 rail.setOpen(!settings.railHidden, false);
