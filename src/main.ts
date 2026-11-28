@@ -25,9 +25,8 @@ import {
 import { DENSITY_MAX, DENSITY_MIN, formatSpeed, loadSettings, saveSettings, SPEED_STEPS, type Settings } from './settings';
 import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { DIAGONALS_MAX, DIAGONALS_MIN, STICKINESS_MAX, STICKINESS_MIN } from './slime';
-import { decodeBoard, encodeBoard, sharedColony } from './share';
 import { createDemo, type Demo, type DemoHost, type DemoKey } from './demos';
-import { isNative, matchStatusBar, nativeShare, PUBLIC_URL, tapLight, tapMedium, tick } from './native';
+import { isNative, matchStatusBar, tapLight, tapMedium, tick } from './native';
 
 /** Wait this long after the board stops changing size before adding or removing rows. */
 const REGRID_DELAY = 120;
@@ -353,7 +352,7 @@ for (const [panel, drawer] of [[libPanel, libDrawer], [setPanel, setDrawer], [la
   });
 }
 
-// Pop-ups beside the rail: colour, draw size, density, speed, and the board actions (soup, clear, share).
+// Pop-ups beside the rail: colour, draw size, density, and speed.
 
 const popButtons = [...railEl.querySelectorAll<HTMLElement>('[data-pop]')];
 const pops = popButtons.map((b) => el(`#${b.dataset.pop}`));
@@ -426,11 +425,6 @@ el('#btnClear').addEventListener('click', () => {
   tapMedium();
   setRunning(false);
   toast('Cleared. Draw something');
-});
-el('#btnShare').addEventListener('click', () => void share());
-// Each board action closes the pop-up it lives in.
-el('#actionsPop').addEventListener('click', (e) => {
-  if ((e.target as Element).closest('button')) closePops();
 });
 
 /** A range input bound to a numeric setting, with its readout. */
@@ -910,7 +904,7 @@ function buildRuleList(): void {
     `<button type="button" class="row" data-v="${code}"><span>${escapeHtml(name)}<code>${code}</code></span><i class="radio"></i></button>`;
   let html = PRESETS.map((p) => row(p.name, p.rule)).join('');
   if (savedRules.length) html += `<div class="list-sub">My rules</div>${savedRules.map((r) => row(r.name, r.rule)).join('')}`;
-  // A rule from a shared link, or one tried in the lab but not saved: list it so the choice stays visible.
+  // A rule tried in the lab but not saved: list it so the choice stays visible.
   if (![...PRESETS, ...savedRules].some((r) => r.rule === settings.rule)) html += row(ruleName(settings.rule, savedRules) ?? 'Unsaved rule', settings.rule);
   html += `<button type="button" class="row row-action" id="openLab"><span>Make your own rule<small>Try, tweak and save rules in the Rule lab</small></span>`
     + `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>`;
@@ -1431,48 +1425,6 @@ themeDelete.addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// Sharing
-
-async function share(): Promise<void> {
-  const fragment = encodeBoard(life, settings.rule);
-  if (!fragment) {
-    toast('Draw something to share');
-    return;
-  }
-  // In the app the page lives at capacitor://localhost, so links point at the web version instead.
-  const url = isNative ? `${PUBLIC_URL}#${fragment}` : `${location.origin}${location.pathname}#${fragment}`;
-  history.replaceState(null, '', `#${fragment}`);
-  if (await nativeShare(url)) return;
-  // Phones get the share sheet; elsewhere the link goes to the clipboard.
-  if (matchMedia('(pointer: coarse)').matches && navigator.share) {
-    try {
-      await navigator.share({ title: 'Bloop Life pattern', url });
-    } catch {
-      // Closing the share sheet is not an error worth reporting.
-    }
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    toast('Pattern link copied');
-  } catch {
-    toast('Copy the link from the address bar');
-  }
-}
-
-/** Load the pattern in the address, if there is one. */
-function loadFromLink(): boolean {
-  const shared = decodeBoard(location.hash);
-  if (!shared) return false;
-  if (shared.rule && shared.rule !== settings.rule) setBoardRule(shared.rule);
-  life.place(shared.cells, sharedColony);
-  boardChanged();
-  toast('Loaded a shared pattern');
-  return true;
-}
-window.addEventListener('hashchange', () => { loadFromLink(); });
-
-// ---------------------------------------------------------------------------------------------
 // Keyboard
 
 document.addEventListener('keydown', (e) => {
@@ -1583,7 +1535,7 @@ railToggled(rail.isOpen); // setOpen only reports changes, and a rail that start
 fitCanvas();
 fitGrid();
 syncBoardPop();
-if (!loadFromLink()) life.soup();
+life.soup();
 setRunning(true);
 updateStats();
 // The styles are in, so the app can show under the loading screen (index.html), which fades out

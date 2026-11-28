@@ -75,12 +75,15 @@
           <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg>
         </button>
         <hr>
-        <button type="button" class="rb" id="btnActions" data-pop="actionsPop" aria-controls="actionsPop" aria-expanded="false" aria-label="Board actions" title="Soup, clear, share">
-          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        <button type="button" class="rb" id="btnRand" aria-label="Random soup" title="Random soup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.5c4.5 0 6.5 10 11 10H21"/><path d="M3 17h3.5c1.8 0 3-1.5 4-3.2M13.5 10.2c1-1.7 2.2-3.2 4-3.2H21"/><path d="M18.5 4.5L21 7l-2.5 2.5M18.5 14.5L21 17l-2.5 2.5"/></svg>
+        </button>
+        <button type="button" class="rb" id="btnClear" aria-label="Clear board" title="Clear">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7l1.2 11.5A2.5 2.5 0 0 0 9.7 21h4.6a2.5 2.5 0 0 0 2.5-2.5L18 7"/><path d="M9.5 7V4.5h5V7"/></svg>
         </button>
         <hr>
-        <button type="button" class="rb" id="btnLib" aria-controls="libPanel" aria-label="Pattern library" title="Patterns">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>
+        <button type="button" class="rb" id="btnLib" aria-controls="libPanel" aria-label="Pattern Catalog" title="Pattern Catalog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="12" cy="8" r="1.4" fill="currentColor"/><circle cx="16" cy="12" r="1.4" fill="currentColor"/><circle cx="8" cy="16" r="1.4" fill="currentColor"/><circle cx="12" cy="16" r="1.4" fill="currentColor"/><circle cx="16" cy="16" r="1.4" fill="currentColor"/></svg>
         </button>
         <button type="button" class="rb" id="btnSet" aria-controls="setPanel" aria-label="Settings" title="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
@@ -90,17 +93,6 @@
     </nav>
 
     <!-- Pop-ups beside the rail. -->
-    <div class="pop pop-actions" id="actionsPop" role="dialog" aria-label="Board actions" hidden>
-      <button type="button" class="rb" id="btnRand" aria-label="Random soup" title="Random soup">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/></svg>
-      </button>
-      <button type="button" class="rb" id="btnClear" aria-label="Clear board" title="Clear">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-      </button>
-      <button type="button" class="rb" id="btnShare" aria-label="Share pattern link" title="Share">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
-      </button>
-    </div>
     <div class="pop" id="colourPop" role="dialog" aria-label="Colour" hidden>
       <h3>Colour</h3>
       <div class="swatches" id="swatches"></div>
@@ -125,7 +117,7 @@
 
   <aside class="panel" id="libPanel" role="dialog" aria-modal="true" aria-labelledby="libTitle">
     <div class="panel-head">
-      <h2 id="libTitle">Patterns</h2>
+      <h2 id="libTitle">Pattern Catalog</h2>
       <span class="stats" id="libCount"></span>
       <button type="button" class="ib ib-sm" data-close aria-label="Close patterns">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>

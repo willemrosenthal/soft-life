@@ -12,7 +12,7 @@ import {
   STICKINESS_MIN,
 } from "./slime";
 
-/** Everything remembered between visits. The board itself isn't saved; share a link for that. */
+/** Everything remembered between visits. The board itself isn't saved. */
 export interface Settings {
   /** A built-in theme's id, or "custom:<id>" for one the player made (see themes.ts). */
   palette: string;

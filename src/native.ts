@@ -5,17 +5,10 @@
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Preferences } from '@capacitor/preferences';
-import { Share } from '@capacitor/share';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { setMirror } from './store';
 
 export const isNative = Capacitor.isNativePlatform();
-
-/**
- * Where shared links point. The app itself lives at capacitor://localhost, which nobody else can
- * open, so links go to the web version, which loads the pattern from the link the same way.
- */
-export const PUBLIC_URL = 'https://soft-life-nt63.onrender.com/';
 
 /**
  * Before the app starts: copy what's saved natively back into localStorage (iOS may have cleared
@@ -50,17 +43,6 @@ export function tapMedium(): void {
 /** A tick, for toggles like play and pause. */
 export function tick(): void {
   if (isNative) void Haptics.selectionChanged();
-}
-
-/** Opens the iOS share sheet with the link. Returns false outside the app, so the web path runs. */
-export async function nativeShare(url: string): Promise<boolean> {
-  if (!isNative) return false;
-  try {
-    await Share.share({ title: 'Bloop Life pattern', url });
-  } catch {
-    // Closing the share sheet is not an error worth reporting.
-  }
-  return true;
 }
 
 /** Dark status bar text on light themes, light text on dark ones. */
