@@ -19,6 +19,9 @@ body {
   font: 13px/1.5 var(--body); -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none; transition: background-color .3s, color .3s; overflow: hidden;
 }
+/* It's an app, not a page: no text selection or long-press callout, except in text fields. */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
 button { font: inherit; color: inherit; }
 /* iOS zooms the page in on focus of any text field under 16px, and with the page locked it stays zoomed. */
 input:not([type=range]), textarea, select { font-size: max(16px, 1em) !important; }

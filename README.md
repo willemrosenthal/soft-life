@@ -24,6 +24,26 @@ npm run preview    # serve dist/ to try the built app (offline mode only works i
 
 `dist/` is a static site: host it anywhere (GitHub Pages, Netlify, any web server). It uses relative paths, so a subfolder works too. Installing to a home screen and offline use need HTTPS (or localhost).
 
+## iPhone app
+
+The same code ships as an iOS app through [Capacitor](https://capacitorjs.com): `ios/` is the Xcode project, and it shows the built `dist/` in a web view.
+
+```sh
+npm run ios        # build, copy into ios/, open Xcode (then pick a phone and press Run)
+npm run ios:sync   # build and copy only, after a web change
+npm run icons      # also writes the app icon and launch screen into ios/
+```
+
+What's different in the app (`src/native.ts`):
+- **Saved data** is mirrored into native storage, because iOS can clear the web view's localStorage. `boot.ts` copies it back before `main.ts` starts. Saving goes through `src/store.ts`.
+- **Share** opens the iOS share sheet with a link to the web version (`PUBLIC_URL`), since the app's own address can't be opened anywhere else.
+- **Haptics** on starting a stroke, play/pause, soup, clear and dropping a pattern. **Status bar** text follows the theme.
+- No service worker: the files are inside the app.
+
+iPhone only, portrait. `ios/App/App/PrivacyInfo.xcprivacy` declares that nothing is collected. The privacy policy is `public/privacy.html`.
+
+The web version is hosted on Render at https://soft-life-nt63.onrender.com. Shared links from the app open there, and the privacy policy is at `/privacy.html`.
+
 ## How it's put together
 
 ```
@@ -38,6 +58,9 @@ src/
   demos.ts      the animated scenes behind each (i) button, and the step-by-step rules player
   themes.ts     custom themes: the seven picks, working out the rest, saving
   miniboard.ts  a small live board (the Rule lab and theme editor previews)
+  boot.ts       entry point: restores saved data in the iOS app, then loads main.ts
+  native.ts     the iOS app's differences: storage, share sheet, haptics, status bar
+  store.ts      reading and writing saved data
   rules.ts      named rules, saved rules, and the Rule lab's mutate, surprise and trend helpers
   palettes.ts   themes
   patterns.ts   the library

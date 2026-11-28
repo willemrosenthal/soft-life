@@ -4,7 +4,7 @@
  * circle-and-neck geometry the board uses (src/render.ts), on the Meadow background.
  *   node scripts/make-icons.mjs
  */
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const OUT = new URL('../public/icons/', import.meta.url);
@@ -38,7 +38,7 @@ function inside(x, y) {
 }
 
 /** `scale`: the blob's width as a share of the icon (smaller for maskable icons, which get cropped). */
-function icon(size, scale) {
+function icon(size, scale, opaque = false) {
   const extent = 1 + 2 * RADIUS; // the L spans this many cell units
   const unit = (size * scale) / extent;
   const SS = 4; // 4×4 samples per pixel for smooth edges
@@ -59,7 +59,7 @@ function icon(size, scale) {
       px[o + 3] = 255;
     }
   }
-  return png(size, px);
+  return png(size, px, opaque);
 }
 
 const CRC = Array.from({ length: 256 }, (_, n) => {
@@ -74,11 +74,17 @@ function chunk(type, data) {
   const sum = Buffer.alloc(4); sum.writeUInt32BE(crc(body));
   return Buffer.concat([len, body, sum]);
 }
-function png(size, rgba) {
-  const raw = Buffer.alloc((size * 4 + 1) * size);
-  for (let y = 0; y < size; y++) rgba.copy(raw, y * (size * 4 + 1) + 1, y * size * 4, (y + 1) * size * 4);
+/** `opaque`: write RGB with no alpha channel, which the App Store requires of the app icon. */
+function png(size, rgba, opaque = false) {
+  const ch = opaque ? 3 : 4;
+  const raw = Buffer.alloc((size * ch + 1) * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      for (let k = 0; k < ch; k++) raw[y * (size * ch + 1) + 1 + x * ch + k] = rgba[(y * size + x) * 4 + k];
+    }
+  }
   const head = Buffer.alloc(13);
-  head.writeUInt32BE(size, 0); head.writeUInt32BE(size, 4); head[8] = 8; head[9] = 6;
+  head.writeUInt32BE(size, 0); head.writeUInt32BE(size, 4); head[8] = 8; head[9] = opaque ? 2 : 6;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', head), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
@@ -86,3 +92,14 @@ for (const [name, size, scale] of [['icon-192', 192, 0.62], ['icon-512', 512, 0.
   writeFileSync(new URL(`${name}.png`, OUT), icon(size, scale));
 }
 console.log('Wrote icons to public/icons/');
+
+// The iOS app (once `npx cap add ios` has made ios/): the App Store icon and the launch screen.
+const IOS = new URL('../ios/App/App/Assets.xcassets/', import.meta.url);
+if (existsSync(IOS)) {
+  writeFileSync(new URL('AppIcon.appiconset/AppIcon-512@2x.png', IOS), icon(1024, 0.62, true));
+  const splash = icon(2732, 0.1, true);
+  for (const name of ['splash-2732x2732.png', 'splash-2732x2732-1.png', 'splash-2732x2732-2.png']) {
+    writeFileSync(new URL(`Splash.imageset/${name}`, IOS), splash);
+  }
+  console.log('Wrote the iOS app icon and launch screen');
+}

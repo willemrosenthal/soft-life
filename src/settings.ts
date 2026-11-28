@@ -1,4 +1,5 @@
 import { BRUSH_MAX, BRUSH_MIN, stepForWidth } from './brush';
+import { readItem, writeItem } from './store';
 import { ABUNDANCE_MAX, ABUNDANCE_MIN, DEFAULT_ABUNDANCE } from './critters';
 import { parseRule } from './life';
 import type { CellStyle, ColourMode } from './render';
@@ -110,7 +111,7 @@ export function parseSettings(value: unknown): Settings {
 /** Storage can be unavailable (private windows, blocked site data): then settings just aren't kept. */
 export function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readItem(KEY);
     return parseSettings(raw ? JSON.parse(raw) : null);
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -119,7 +120,7 @@ export function loadSettings(): Settings {
 
 export function saveSettings(s: Settings): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    writeItem(KEY, JSON.stringify(s));
   } catch {
     // Not kept; nothing else to do.
   }

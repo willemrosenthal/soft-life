@@ -1,4 +1,5 @@
 import { parseRule, type Rule } from './life';
+import { readItem, writeItem } from './store';
 
 /**
  * Named rules, the player's own saved rules, and the helpers behind the Rule lab: mutating a rule,
@@ -171,7 +172,7 @@ export function parseSavedRules(value: unknown): SavedRule[] {
 /** Storage can be unavailable (private windows, blocked site data): then there are no saved rules. */
 export function loadRules(): SavedRule[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readItem(KEY);
     return parseSavedRules(raw ? JSON.parse(raw) : null);
   } catch {
     return [];
@@ -180,7 +181,7 @@ export function loadRules(): SavedRule[] {
 
 export function saveRules(rules: readonly SavedRule[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(rules));
+    writeItem(KEY, JSON.stringify(rules));
   } catch {
     // Not kept; nothing else to do.
   }

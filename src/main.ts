@@ -27,6 +27,7 @@ import { GAPS_MAX, GAPS_MIN, MELT_MAX, MELT_MIN } from './melt';
 import { DIAGONALS_MAX, DIAGONALS_MIN, STICKINESS_MAX, STICKINESS_MIN } from './slime';
 import { decodeBoard, encodeBoard, sharedColony } from './share';
 import { createDemo, type Demo, type DemoHost, type DemoKey } from './demos';
+import { isNative, matchStatusBar, nativeShare, PUBLIC_URL, tapLight, tapMedium, tick } from './native';
 
 /** Wait this long after the board stops changing size before adding or removing rows. */
 const REGRID_DELAY = 120;
@@ -209,6 +210,7 @@ function startPaint(e: PointerEvent): void {
   // Starting on a live cell erases for the whole stroke; otherwise it draws in the chosen colour.
   paintColony = brush === 'erase' || life.cur[i] ? 0 : brush + 1;
   painting = true;
+  tapLight();
   lastPoint = p;
   dab(p);
   setHover(p, e.pointerType === 'mouse');
@@ -401,7 +403,7 @@ function setRunning(on: boolean): void {
   lastStep = performance.now();
 }
 
-playButton.addEventListener('click', () => setRunning(!running));
+playButton.addEventListener('click', () => { tick(); setRunning(!running); });
 el('#btnStep').addEventListener('click', () => {
   setRunning(false);
   life.step(rule, settings.wrap);
@@ -410,11 +412,13 @@ el('#btnStep').addEventListener('click', () => {
 el('#btnRand').addEventListener('click', () => {
   life.soup();
   boardChanged();
+  tapMedium();
   toast('New random soup');
 });
 el('#btnClear').addEventListener('click', () => {
   life.clear();
   boardChanged();
+  tapMedium();
   setRunning(false);
   toast('Cleared. Draw something');
 });
@@ -772,6 +776,7 @@ function loadPattern(index: number): void {
   if (switched) setBoardRule(libRule);
   life.place(orientedCells(pattern.cells), (ch) => (ch === 'O' ? colony : 0));
   boardChanged();
+  tapMedium();
   libDrawer.setOpen(false);
   toast(switched ? `Loaded ${pattern.name} and switched to ${libRuleName(libRule)}` : `Loaded ${pattern.name}`);
 }
@@ -929,6 +934,7 @@ function applyTheme(): void {
   root.setProperty('--app-muted', p.muted);
   root.setProperty('--app-accent', p.accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg);
+  matchStatusBar(p.bg);
   buildThemes();
   buildSwatches();
   drawThumbnails();
@@ -1403,8 +1409,10 @@ async function share(): Promise<void> {
     toast('Draw something to share');
     return;
   }
-  const url = `${location.origin}${location.pathname}#${fragment}`;
+  // In the app the page lives at capacitor://localhost, so links point at the web version instead.
+  const url = isNative ? `${PUBLIC_URL}#${fragment}` : `${location.origin}${location.pathname}#${fragment}`;
   history.replaceState(null, '', `#${fragment}`);
+  if (await nativeShare(url)) return;
   // Phones get the share sheet; elsewhere the link goes to the clipboard.
   if (matchMedia('(pointer: coarse)').matches && navigator.share) {
     try {
@@ -1550,6 +1558,10 @@ setRunning(true);
 updateStats();
 requestAnimationFrame((t) => { lastStep = t; requestAnimationFrame(frame); });
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => { void navigator.serviceWorker.register('./sw.js'); });
+// The app ships its files inside itself, so only the web version needs the offline worker.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNative) {
+  const register = () => { void navigator.serviceWorker.register('./sw.js'); };
+  // main.ts now loads after boot.ts, possibly after the page's load event has already fired.
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register);
 }

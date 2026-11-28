@@ -1,4 +1,5 @@
 import { contrast, difference, hexToLch, lchToHex } from './oklab';
+import { readItem, writeItem } from './store';
 import { isPaletteId, PALETTES, type Palette } from './palettes';
 
 /**
@@ -158,7 +159,7 @@ export function parseThemes(value: unknown): CustomTheme[] {
 /** Storage can be unavailable (private windows, blocked site data): then there are no saved themes. */
 export function loadThemes(): CustomTheme[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readItem(KEY);
     return parseThemes(raw ? JSON.parse(raw) : null);
   } catch {
     return [];
@@ -167,7 +168,7 @@ export function loadThemes(): CustomTheme[] {
 
 export function saveThemes(themes: readonly CustomTheme[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(themes));
+    writeItem(KEY, JSON.stringify(themes));
   } catch {
     // Not kept; nothing else to do.
   }

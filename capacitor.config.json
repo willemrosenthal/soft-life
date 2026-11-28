@@ -1,0 +1,11 @@
+{
+  "appId": "com.willemrosenthal.softlife",
+  "appName": "Softlife",
+  "webDir": "dist",
+  "backgroundColor": "#F3F5EF",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "allowsLinkPreview": false
+  }
+}
