@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Draws the app icons into public/icons/: three cells in an L, merged into one blob with the same
- * circle-and-neck geometry the board uses (src/render.ts), on the Meadow background.
+ * circle-and-neck geometry the board uses (src/render.ts), on the Meadow background. The corner cell
+ * has a critter eye (src/critters.ts) glancing down at the tail.
  *   node scripts/make-icons.mjs
  */
 import { existsSync, writeFileSync } from 'node:fs';
@@ -14,6 +15,18 @@ const RADIUS = 0.47;
 const WAIST = 0.29;
 /** Cell centres, in cell units. */
 const CELLS = [[0, 0], [1, 0], [1, 1]];
+
+// The eye, sized like Eye.draw in critters.ts (eye 0.437 of a cell, white 0.78 of the eye, pupil
+// 0.146 of a cell), a little larger, with the pupil pushed toward the tail.
+const WHITE = [0xff, 0xff, 0xff];
+const PUPIL = [0x16, 0x16, 0x16];
+const EYE_AT = [1, 0];
+const EYE_SIZE = 1.08;
+const EYE_WHITE = 0.437 * EYE_SIZE * 0.78;
+const EYE_PUPIL = 0.146 * EYE_SIZE;
+const GLANCE = [-0.55, 0.75];
+const REACH = EYE_WHITE - EYE_PUPIL - 0.012;
+const PUPIL_AT = [EYE_AT[0] + GLANCE[0] * REACH, EYE_AT[1] + GLANCE[1] * REACH];
 
 // Neck between two touching cells (one cell apart), from render.ts's neck(): its sides are arcs
 // of radius f centred at (h, ±d), between the tangent points at x = h·q and 1 − h·q.
@@ -37,6 +50,13 @@ function inside(x, y) {
   return false;
 }
 
+/** The colour at a point, in cell units. */
+function colourAt(x, y) {
+  if ((x - PUPIL_AT[0]) ** 2 + (y - PUPIL_AT[1]) ** 2 <= EYE_PUPIL * EYE_PUPIL) return PUPIL;
+  if ((x - EYE_AT[0]) ** 2 + (y - EYE_AT[1]) ** 2 <= EYE_WHITE * EYE_WHITE) return WHITE;
+  return inside(x, y) ? INK : BG;
+}
+
 /** `scale`: the blob's width as a share of the icon (smaller for maskable icons, which get cropped). */
 function icon(size, scale, opaque = false) {
   const extent = 1 + 2 * RADIUS; // the L spans this many cell units
@@ -45,17 +65,17 @@ function icon(size, scale, opaque = false) {
   const px = Buffer.alloc(size * size * 4);
   for (let py = 0; py < size; py++) {
     for (let pxi = 0; pxi < size; pxi++) {
-      let hits = 0;
+      const sum = [0, 0, 0];
       for (let sy = 0; sy < SS; sy++) {
         for (let sx = 0; sx < SS; sx++) {
           const x = (pxi + (sx + 0.5) / SS - size / 2) / unit + 0.5;
           const y = (py + (sy + 0.5) / SS - size / 2) / unit + 0.5;
-          if (inside(x, y)) hits++;
+          const c = colourAt(x, y);
+          for (let k = 0; k < 3; k++) sum[k] += c[k];
         }
       }
-      const a = hits / (SS * SS);
       const o = (py * size + pxi) * 4;
-      for (let k = 0; k < 3; k++) px[o + k] = Math.round(BG[k] + (INK[k] - BG[k]) * a);
+      for (let k = 0; k < 3; k++) px[o + k] = Math.round(sum[k] / (SS * SS));
       px[o + 3] = 255;
     }
   }
@@ -88,7 +108,7 @@ function png(size, rgba, opaque = false) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', head), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
-for (const [name, size, scale] of [['icon-192', 192, 0.62], ['icon-512', 512, 0.62], ['maskable-512', 512, 0.48], ['apple-touch-icon', 180, 0.58]]) {
+for (const [name, size, scale] of [['icon-192', 192, 0.64], ['icon-512', 512, 0.64], ['maskable-512', 512, 0.48], ['apple-touch-icon', 180, 0.58]]) {
   writeFileSync(new URL(`${name}.png`, OUT), icon(size, scale));
 }
 console.log('Wrote icons to public/icons/');
@@ -96,7 +116,7 @@ console.log('Wrote icons to public/icons/');
 // The iOS app (once `npx cap add ios` has made ios/): the App Store icon and the launch screen.
 const IOS = new URL('../ios/App/App/Assets.xcassets/', import.meta.url);
 if (existsSync(IOS)) {
-  writeFileSync(new URL('AppIcon.appiconset/AppIcon-512@2x.png', IOS), icon(1024, 0.62, true));
+  writeFileSync(new URL('AppIcon.appiconset/AppIcon-512@2x.png', IOS), icon(1024, 0.64, true));
   const splash = icon(2732, 0.1, true);
   for (const name of ['splash-2732x2732.png', 'splash-2732x2732-1.png', 'splash-2732x2732-2.png']) {
     writeFileSync(new URL(`Splash.imageset/${name}`, IOS), splash);

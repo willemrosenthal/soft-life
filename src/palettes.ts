@@ -38,6 +38,12 @@ export const PALETTES = {
     cells: ['#FF48B0', '#0078BF', '#FFE800', '#00A95C', '#FF6C2F', '#765BA7'], solo: '#0078BF',
     age: ['#FFE800', '#FF6C2F', '#FF48B0', '#765BA7', '#0078BF'],
   },
+  candy: {
+    name: 'Candy', bg: '#FBFAFD', fg: '#1A1A2E', panel: '#FFFFFF', line: '#E4E1EC', muted: '#6E6A80', accent: '#FB65B0',
+    dot: 'rgba(26,26,46,.10)', iris: '#1EEB8F',
+    cells: ['#FF68B3', '#D48BFF', '#FFE800', '#1EEB8F', '#A5FF2E', '#6FEEFF'], solo: '#FF68B3',
+    age: ['#FFE800', '#A5FF2E', '#6FEEFF', '#D48BFF', '#FF68B3'],
+  },
 } satisfies Record<string, Palette>;
 
 export type PaletteId = keyof typeof PALETTES;
