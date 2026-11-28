@@ -66,7 +66,7 @@ describe('pattern library', () => {
     (name, rule, note) => {
       const r = parseRule(rule)!;
       const s = toCells(byName(name).cells);
-      const period = { Glider: 4, LWSS: 4, MWSS: 4, HWSS: 4, Loafer: 7 }[name] ?? Number(/period (\d+)/.exec(note)![1]);
+      const period = { Glider: 4, LWSS: 4, MWSS: 4, HWSS: 4, Loafer: 7, Copperhead: 10 }[name] ?? Number(/period (\d+)/.exec(note)![1]);
       for (let g = 1; g < period; g++) expect(shape(run(s, g, r)), `gen ${g}`).not.toBe(shape(s));
       expect(shape(run(s, period, r))).toBe(shape(s));
     },
