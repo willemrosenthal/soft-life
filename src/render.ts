@@ -2,7 +2,7 @@ import { Critters } from './critters';
 import type { Life } from './life';
 import type { Palette } from './palettes';
 import { MeltRenderer } from './melt';
-import { RADIUS, traceSlime } from './slime';
+import { traceSlime } from './slime';
 
 /**
  * Drawing. The simulation is plain Life; only the picture is soft. In the goo style, same-coloured
@@ -49,7 +49,7 @@ function cellPaths(g: CellLayer): Path2D[] {
     traceSlime({ cols, rows, cell: c, ox, oy, size, colour, wrap: g.wrap ?? false }, colours.length, g.stickiness ?? 50, (k) => paths[k]!, g.diagonals ?? 0);
     return paths;
   }
-  const R = RADIUS * c;
+  const R = 0.5 * c;
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
@@ -59,7 +59,7 @@ function cellPaths(g: CellLayer): Path2D[] {
       const cx = ox + (x + 0.5) * c;
       const cy = oy + (y + 0.5) * c;
       if (style === 'pixels') {
-        const half = c * 0.46 * Math.min(s, 1);
+        const half = c * 0.5 * Math.min(s, 1);
         p.rect(cx - half, cy - half, 2 * half, 2 * half);
         continue;
       }
