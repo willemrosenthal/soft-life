@@ -5,7 +5,7 @@ import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/jetbrains-mono/500.css';
 import './styles.css';
-import { BRUSH_MAX, BRUSH_MIN, brushAt, brushCells, brushCentre, strokePoints, type Point } from './brush';
+import { BRUSH_MAX, BRUSH_MIN, brushAt, brushCells, brushCentre, newStrokeSeed, strokePoints, type Point } from './brush';
 import { ABUNDANCE_MAX, ABUNDANCE_MIN } from './critters';
 import { Drawer, DrawerStack } from './drawers';
 import { Life, parseRule, type Rule } from './life';
@@ -177,6 +177,8 @@ function boardChanged(): void {
 
 let painting = false;
 let paintColony = 0;
+/** Picks the airbrush's holes: new for each stroke, kept for its length so a drag doesn't fill them in. */
+let strokeSeed = 0;
 let lastPoint: Point | null = null;
 /** Where the pointer is over the board, for the brush ring; and whether it's a mouse (rings show on hover). */
 let hover: Point | null = null;
@@ -195,7 +197,8 @@ function cellAt(p: Point): number {
 }
 
 function dab(p: Point): void {
-  for (const i of brushCells(p, brushAt(settings.brushStep), life.cols, life.rows, settings.wrap)) life.setCell(i, paintColony);
+  // Erasing clears the whole footprint, even with an airbrush.
+  for (const i of brushCells(p, brushAt(settings.brushStep), life.cols, life.rows, settings.wrap, paintColony === 0, strokeSeed)) life.setCell(i, paintColony);
 }
 
 function startPaint(e: PointerEvent): void {
@@ -209,6 +212,7 @@ function startPaint(e: PointerEvent): void {
   }
   // Starting on a live cell erases for the whole stroke; otherwise it draws in the chosen colour.
   paintColony = brush === 'erase' || life.cur[i] ? 0 : brush + 1;
+  strokeSeed = newStrokeSeed();
   painting = true;
   tapLight();
   lastPoint = p;
@@ -610,7 +614,8 @@ function drawBrushPreview(): void {
   const b = brushAt(settings.brushStep);
   const n = b.width;
   const size = new Float32Array(n * n);
-  for (const i of brushCells({ x: n / 2, y: n / 2 }, b, n, n, false)) size[i] = 1;
+  // A fixed seed, so the preview doesn't change its holes every time it redraws.
+  for (const i of brushCells({ x: n / 2, y: n / 2 }, b, n, n, false, brush === 'erase', 1)) size[i] = 1;
   const cell = w / Math.max(n, 3);
   const offset = (w - cell * n) / 2;
   g.clearRect(0, 0, w, w);

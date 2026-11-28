@@ -271,15 +271,17 @@ const SLIDERS: Record<Exclude<DemoKey, 'rules'>, () => SliderSpec> = {
       caption: (v) => {
         const b = brushAt(v);
         return b.width === 1 ? '<b>1 dot.</b> Place single cells exactly, for building patterns by hand.'
-          : b.width < 5 ? `<b>${b.name}.</b> A small brush for quick, thin shapes.` : `<b>${b.name}.</b> Paint big areas and let them break apart.`;
+          : !b.airbrush ? `<b>${b.name}.</b> A small brush for quick, thin shapes.`
+            : `<b>${b.name}.</b> Nearly solid, with a scatter of holes and a soft edge, so what you paint lives on instead of dying at once.`;
       },
       draw: ({ ctx, w, h }, v, now, host) => {
         // A stroke drawn along a wave over four seconds, then wiped and drawn again.
         const b = brushAt(v);
         const t = (now % 4000) / 4000;
+        const seed = Math.floor(now / 4000); // each pass is a new stroke, with its own holes
         const at = (u: number): Point => ({ x: 3 + u * (cols - 6), y: rows / 2 + Math.sin(u * Math.PI * 2) * 2.4 });
         life.clear();
-        for (let k = 0; k <= 60; k++) for (const i of brushCells(at((k / 60) * t), b, cols, rows, false)) life.setCell(i, 1);
+        for (let k = 0; k <= 60; k++) for (const i of brushCells(at((k / 60) * t), b, cols, rows, false, false, seed)) life.setCell(i, 1);
         const p = at(t);
         renderer.brushRing = { x: p.x, y: p.y, size: b.width, colour: host.palette().cells[0]! };
         renderer.draw(ctx, life, fitView(w, h, cols, rows), host.palette(), look(host), 1, now);

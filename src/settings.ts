@@ -86,7 +86,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   melt: 75,
   gaps: 50,
   brushStep: 0,
-  rotateColours: false,
+  rotateColours: true,
   railHidden: false,
   stylePreview: "shapes",
   stylePreviewShown: false,
