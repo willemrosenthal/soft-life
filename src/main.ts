@@ -942,6 +942,11 @@ function applyTheme(): void {
   root.setProperty('--app-muted', p.muted);
   root.setProperty('--app-accent', p.accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg);
+  // For the loading screen in index.html, which runs before anything else. It's only a cache, so it
+  // goes straight to localStorage rather than through store.ts and its native mirror.
+  root.setProperty('--boot-bg', p.bg);
+  root.setProperty('--boot-ink', p.cells[0]!);
+  try { localStorage.setItem('softlife:boot', JSON.stringify({ bg: p.bg, ink: p.cells[0] })); } catch { /* not kept */ }
   matchStatusBar(p.bg);
   buildThemes();
   buildSwatches();
@@ -1575,6 +1580,16 @@ if (!loadFromLink()) life.soup();
 setRunning(true);
 updateStats();
 requestAnimationFrame((t) => { lastStep = t; requestAnimationFrame(frame); });
+
+// The styles are in, so show the app under the loading screen (index.html), then fade that out
+// once the board has drawn its first frame.
+document.documentElement.classList.remove('booting');
+requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  boot.classList.add('done');
+  setTimeout(() => boot.remove(), 400);
+})));
 
 // The app ships its files inside itself, so only the web version needs the offline worker.
 if ('serviceWorker' in navigator && import.meta.env.PROD && !isNative) {

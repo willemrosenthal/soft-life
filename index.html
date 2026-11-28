@@ -11,8 +11,48 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" href="./icons/icon-192.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <style>
+    /* Loading screen: on screen from the first paint, before the app's own styles arrive with main.ts,
+       which fades it out once the board has drawn. Colours are the last theme used (see below). */
+    html { background: var(--boot-bg, #F3F5EF); }
+    html.booting #app { visibility: hidden; }
+    .boot { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: var(--boot-bg, #F3F5EF); transition: opacity .3s ease; }
+    .boot.done { opacity: 0; pointer-events: none; }
+    /* Matches the iOS launch screen, whose square splash image fills the longer side with the blob a tenth of it across. */
+    .boot svg { width: 10vmax; height: 10vmax; }
+    @media (prefers-reduced-motion: reduce) { .boot { transition: none; } }
+  </style>
+  <script>
+    // main.ts saves the theme's background and first cell colour here, so the loading screen opens in them.
+    (function () {
+      var root = document.documentElement;
+      root.classList.add('booting');
+      try {
+        var t = JSON.parse(localStorage.getItem('softlife:boot') || 'null');
+        var hex = /^#[0-9a-f]{6}$/i;
+        if (t && hex.test(t.bg) && hex.test(t.ink)) {
+          root.style.setProperty('--boot-bg', t.bg);
+          root.style.setProperty('--boot-ink', t.ink);
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', t.bg);
+        }
+      } catch (e) { /* no storage: Meadow colours */ }
+    })();
+  </script>
 </head>
 <body>
+  <!-- The app icon's blob (scripts/make-icons.mjs): three cells in an L, with an eye in the corner cell. -->
+  <div class="boot" id="boot" aria-hidden="true">
+    <svg viewBox="-0.47 -0.47 1.94 1.94">
+      <g fill="var(--boot-ink, #3E9A47)">
+        <circle cx="0" cy="0" r="0.47"/><circle cx="1" cy="0" r="0.47"/><circle cx="1" cy="1" r="0.47"/>
+        <path d="M0.2996 -0.3622A0.3144 0.3144 0 0 0 0.7004 -0.3622L0.7004 0.3622A0.3144 0.3144 0 0 0 0.2996 0.3622Z"/>
+        <path d="M1.3622 0.2996A0.3144 0.3144 0 0 0 1.3622 0.7004L0.6378 0.7004A0.3144 0.3144 0 0 0 0.6378 0.2996Z"/>
+      </g>
+      <circle cx="1" cy="0" r="0.3681" fill="#FFFFFF"/>
+      <circle cx="0.8909" cy="0.1488" r="0.1577" fill="#161616"/>
+    </svg>
+  </div>
+
   <div class="app" id="app">
     <main class="board" id="board">
       <canvas id="cv" aria-label="Game board. Tap or drag to draw cells."></canvas>
