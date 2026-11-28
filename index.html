@@ -135,7 +135,8 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg><span>Show preview</span>
         </button>
         <!-- The board in this look, since the panel hides most of the real one: still shapes or a live soup. -->
-        <div class="preview preview-wide" id="stylePreview" hidden>
+        <div class="collapse" id="stylePreviewWrap"><div class="collapse-inner">
+        <div class="preview preview-wide" id="stylePreview">
           <canvas id="styleCv" aria-label="Preview of the cell style"></canvas>
           <div class="preview-seg" role="group" aria-label="Preview">
             <button type="button" data-preview="shapes">Shapes</button><button type="button" data-preview="live">Live</button>
@@ -146,6 +147,7 @@
             </button>
           </div>
         </div>
+        </div></div>
         <div class="slider" id="stickyRow"><h3><label for="stickiness">Stickiness</label><button type="button" class="info-dot" data-demo="stickiness" aria-label="Show what stickiness does"></button><output id="stickyOut" for="stickiness"></output></h3><input type="range" id="stickiness"></div>
         <div class="slider" id="diagRow"><h3><label for="diagonals">Diagonals</label><button type="button" class="info-dot" data-demo="diagonals" aria-label="Show what diagonals does"></button><output id="diagOut" for="diagonals"></output></h3><input type="range" id="diagonals"></div>
         <div class="slider" id="meltRow"><h3><label for="melt">Colour melt</label><button type="button" class="info-dot" data-demo="melt" aria-label="Show what colour melt does"></button><output id="meltOut" for="melt"></output></h3><input type="range" id="melt"></div>
@@ -299,11 +301,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
       </button>
       <h2 id="themeTitle">New theme</h2>
-      <button type="button" class="ib ib-sm" data-close aria-label="Close theme editor">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
+      <button type="button" class="pill pill-head" id="themeSave" title="Save and use this theme">Save</button>
     </div>
     <div class="panel-body">
+      <div class="group"><h3><label for="themeName">Name</label></h3><input class="field" id="themeName" type="text" autocomplete="off"></div>
       <div class="preview">
         <canvas id="themeCv" aria-label="Preview of the theme"></canvas>
         <button type="button" class="ib ib-sm" id="themeSoup" aria-label="Restart the preview from new soup" title="New soup">
@@ -339,9 +340,9 @@
         <p class="theme-note" id="colourNote"></p>
       </div>
       <p class="theme-note" id="themeNote"></p>
-      <div class="group"><h3><label for="themeName">Name</label></h3><input class="field" id="themeName" type="text" autocomplete="off"></div>
-      <button type="button" class="pill pill-wide" id="themeSave">Save and use</button>
-      <button type="button" class="ghost danger" id="themeDelete" hidden>Delete this theme</button>
+      <button type="button" class="ghost danger" id="themeDelete" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>Delete this theme
+      </button>
     </div>
   </aside>
 

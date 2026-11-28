@@ -124,6 +124,8 @@ svg { display: block; }
   padding-top: env(safe-area-inset-top, 0px); padding-right: env(safe-area-inset-right, 0px);
   background: color-mix(in srgb, var(--app-bg) 94%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
   border-radius: 28px 0 0 28px; box-shadow: -12px 0 44px -16px rgba(0, 0, 0, .45);
+  /* Clip the scrolling body to the rounded corners, so content doesn't spill past the drawer's edge. */
+  overflow: hidden;
 }
 .panel-head { display: flex; align-items: center; gap: 10px; padding: 18px 14px 12px 20px; flex: none; }
 .panel-head h2 { margin: 0; font: 800 20px/1 var(--display); letter-spacing: -.02em; }
@@ -205,6 +207,13 @@ svg { display: block; }
 }
 .preview-toggle svg { width: 13px; height: 13px; transition: transform .2s var(--ease); }
 .preview-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+/* Opens and closes by easing its one grid row between 0fr and 1fr; the negative margin swallows the parent's gap while shut. */
+.collapse {
+  display: grid; grid-template-rows: 0fr; margin-top: -8px; opacity: 0;
+  transition: grid-template-rows .32s var(--ease), margin-top .32s var(--ease), opacity .24s var(--ease);
+}
+.collapse.open { grid-template-rows: 1fr; margin-top: 0; opacity: 1; }
+.collapse-inner { min-height: 0; overflow: hidden; }
 /* Not --glass: that's worked out at the root, and the theme editor wears its own colours. */
 .preview .ib { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; background: color-mix(in srgb, var(--app-panel) 88%, transparent); }
 .preview .ib svg { width: 16px; height: 16px; }
@@ -239,6 +248,9 @@ svg { display: block; }
 .field { flex: 1 1 140px; min-width: 0; border: 0; border-radius: 12px; padding: 9px 12px; background: var(--app-panel); color: var(--app-fg); font: inherit; box-shadow: inset 0 0 0 1px var(--app-line); }
 .field::placeholder { color: var(--app-muted); }
 .pill-wide { padding: 11px 14px; font-size: 13px; }
+/* Save in a panel header, where the close button usually sits. */
+.pill-head { margin-left: auto; padding: 8px 14px; font-size: 13px; }
+.pill:disabled { cursor: default; opacity: .35; }
 .rule-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .rule-card { position: relative; border-radius: 16px; overflow: hidden; background: var(--app-panel); box-shadow: inset 0 0 0 1px var(--app-line); }
 /* An outline, not an inset shadow: it draws over the thumbnail, so the whole edge shows. */
@@ -388,7 +400,12 @@ svg { display: block; }
 }
 .theme-surprise { justify-self: start; display: flex; align-items: center; gap: 6px; }
 .theme-surprise .ib:disabled { cursor: default; opacity: .35; }
-.ghost.danger { justify-self: center; color: #C4473C; box-shadow: none; background: none; }
+/* Delete: a full-width button tinted red, so it reads as a real action but stays apart from Save. */
+.ghost.danger {
+  justify-content: center; padding: 11px 14px; font-size: 13px; color: #C4473C;
+  background: color-mix(in srgb, #C4473C 10%, var(--app-panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #C4473C 35%, transparent);
+}
+.ghost.danger:hover { background: color-mix(in srgb, #C4473C 16%, var(--app-panel)); }
 .colour-edit {
   display: grid; gap: 10px; padding: 12px; border-radius: 16px; background: var(--app-panel); box-shadow: inset 0 0 0 1px var(--app-line);
   animation: colour-open .2s var(--ease);

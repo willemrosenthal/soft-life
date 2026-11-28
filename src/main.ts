@@ -12,7 +12,7 @@ import { Life, parseRule, type Rule } from './life';
 import 'vanilla-colorful/hex-color-picker.js';
 import { PALETTES, type Palette } from './palettes';
 import {
-  CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, surpriseTheme, hardToSee, isDark, isHex, loadThemes, nextThemeName, resolvePalette, saveThemes, standOut, themeKey,
+  CELL_COUNT, derivePalette, NAME_MAX as THEME_NAME_MAX, surpriseTheme, hardToSee, isDark, isHex, loadThemes, resolvePalette, saveThemes, standOut, themeKey,
   type CustomTheme,
 } from './themes';
 import { CATEGORY_INFO, LIFE, PATTERNS, type PatternCategory } from './patterns';
@@ -300,7 +300,8 @@ function panelToggled(panel: HTMLElement, opener: HTMLElement, open: boolean): v
   railEl.inert = open || !rail.isOpen;
   if (open) {
     closePops();
-    el<HTMLElement>('[data-close]', panel).focus({ preventScroll: true });
+    // Panels without a close button (the theme editor has Save there) focus their first header button.
+    (panel.querySelector<HTMLElement>('[data-close]') ?? el<HTMLElement>('.panel-head button', panel)).focus({ preventScroll: true });
     if (panel === libPanel) drawThumbnails();
     if (panel === setPanel) resetStylePreview();
     if (panel === labPanel) labBoard.fit();
@@ -531,6 +532,7 @@ const STYLE_SHAPES: readonly (readonly [number, number, number])[] = [
 const STYLE_GRID = { shapes: [17, 9], live: [18, 10] } as const;
 
 const stylePreviewEl = el('#stylePreview');
+const stylePreviewWrap = el('#stylePreviewWrap');
 const styleShow = el('#styleShow');
 const styleSoup = el('#styleSoup');
 const styleBoard = miniBoard(el<HTMLCanvasElement>('#styleCv'), STYLE_GRID.shapes[0], STYLE_GRID.shapes[1]);
@@ -539,7 +541,8 @@ const styleQuiet = new QuietWatcher();
 /** Show or hide the preview, fill it for its mode (the shapes, or fresh soup) and set the controls to match. */
 function resetStylePreview(): void {
   const { stylePreview: mode, stylePreviewShown: shown } = settings;
-  stylePreviewEl.hidden = !shown;
+  stylePreviewWrap.classList.toggle('open', shown);
+  stylePreviewWrap.inert = !shown;
   styleShow.setAttribute('aria-expanded', String(shown));
   el('span', styleShow).textContent = shown ? 'Hide preview' : 'Show preview';
   for (const b of stylePreviewEl.querySelectorAll<HTMLElement>('[data-preview]')) b.setAttribute('aria-pressed', String(b.dataset.preview === mode));
@@ -1207,6 +1210,13 @@ const EDITOR_VARS = ['bg', 'fg', 'panel', 'line', 'muted', 'accent'] as const;
 const colourOf = (i: number) => (i === BG ? draft.bg : draft.cells[i]!);
 const colourName = (i: number) => (i === BG ? 'Background' : `Colour ${i + 1}`);
 
+const themeSave = el<HTMLButtonElement>('#themeSave');
+/** Save is greyed out while a new theme has no name. */
+function syncThemeSave(): void {
+  themeSave.disabled = editingTheme === null && !themeName.value.trim();
+}
+themeName.addEventListener('input', syncThemeSave);
+
 function openThemeEditor(theme: CustomTheme | null): void {
   const p = palette();
   editingTheme = theme?.id ?? null;
@@ -1214,7 +1224,9 @@ function openThemeEditor(theme: CustomTheme | null): void {
   draft = theme ? { ...theme, cells: [...theme.cells] } : { id: '', name: '', bg: p.bg.slice(0, 7).toUpperCase(), cells: p.cells.slice(0, CELL_COUNT).map((c) => c.toUpperCase()) };
   el('#themeTitle').textContent = theme ? 'Edit theme' : 'New theme';
   themeName.value = theme?.name ?? '';
-  themeName.placeholder = theme?.name ?? nextThemeName(customThemes);
+  // A new theme needs a name before it can be saved; an existing one keeps its old name if the field is cleared.
+  themeName.placeholder = theme?.name ?? 'Name your theme';
+  syncThemeSave();
   themeDelete.hidden = !theme;
   resetSurpriseHistory();
   pickColour(null);
@@ -1364,7 +1376,8 @@ function runThemePreview(now: number): void {
   }
 }
 
-el('#themeSave').addEventListener('click', () => {
+themeSave.addEventListener('click', () => {
+  if (themeSave.disabled) return;
   const name = (themeName.value.trim() || themeName.placeholder).slice(0, THEME_NAME_MAX);
   const existing = customThemes.find((t) => t.id === editingTheme);
   const theme: CustomTheme = { id: existing?.id ?? Date.now().toString(36), name, bg: draft.bg, cells: [...draft.cells] };
