@@ -2,10 +2,11 @@
 /**
  * Draws the app icons into public/icons/: three cells in an L, merged into one blob with the same
  * circle-and-neck geometry the board uses (src/render.ts), on the Meadow background. The corner cell
- * has a critter eye (src/critters.ts) glancing down at the tail.
+ * has a critter eye (src/critters.ts) glancing down at the tail. The same blob, as SVG, goes into
+ * index.html's loading screen.
  *   node scripts/make-icons.mjs
  */
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const OUT = new URL('../public/icons/', import.meta.url);
@@ -22,10 +23,10 @@ const WHITE = [0xff, 0xff, 0xff];
 const PUPIL = [0x16, 0x16, 0x16];
 const EYE_AT = [1, 0];
 const EYE_SIZE = 1.08;
-const EYE_WHITE = 0.437 * EYE_SIZE * 0.78;
-const EYE_PUPIL = 0.146 * EYE_SIZE;
+const WHITE_R = 0.437 * EYE_SIZE * 0.78;
+const PUPIL_R = 0.146 * EYE_SIZE;
 const GLANCE = [-0.55, 0.75];
-const REACH = EYE_WHITE - EYE_PUPIL - 0.012;
+const REACH = WHITE_R - PUPIL_R - 0.012;
 const PUPIL_AT = [EYE_AT[0] + GLANCE[0] * REACH, EYE_AT[1] + GLANCE[1] * REACH];
 
 // Neck between two touching cells (one cell apart), from render.ts's neck(): its sides are arcs
@@ -39,22 +40,40 @@ function inNeck(along, across) {
   const dx = along - h;
   return Math.abs(across) <= d - Math.sqrt(f * f - dx * dx);
 }
+/** Necks join touching cells: [x, y, down], from the cell at (x, y) to the one right of it or below it. */
+const NECKS = CELLS.flatMap(([ax, ay]) => CELLS.flatMap(([bx, by]) =>
+  bx === ax + 1 && by === ay ? [[ax, ay, false]] : bx === ax && by === ay + 1 ? [[ax, ay, true]] : []));
 function inside(x, y) {
   for (const [cx, cy] of CELLS) if ((x - cx) ** 2 + (y - cy) ** 2 <= RADIUS * RADIUS) return true;
-  for (const [ax, ay] of CELLS) {
-    for (const [bx, by] of CELLS) {
-      if (bx === ax + 1 && by === ay && inNeck(x - ax, y - ay)) return true;
-      if (bx === ax && by === ay + 1 && inNeck(y - ay, x - ax)) return true;
-    }
-  }
-  return false;
+  return NECKS.some(([ax, ay, down]) => (down ? inNeck(y - ay, x - ax) : inNeck(x - ax, y - ay)));
 }
 
 /** The colour at a point, in cell units. */
 function colourAt(x, y) {
-  if ((x - PUPIL_AT[0]) ** 2 + (y - PUPIL_AT[1]) ** 2 <= EYE_PUPIL * EYE_PUPIL) return PUPIL;
-  if ((x - EYE_AT[0]) ** 2 + (y - EYE_AT[1]) ** 2 <= EYE_WHITE * EYE_WHITE) return WHITE;
+  if ((x - PUPIL_AT[0]) ** 2 + (y - PUPIL_AT[1]) ** 2 <= PUPIL_R * PUPIL_R) return PUPIL;
+  if ((x - EYE_AT[0]) ** 2 + (y - EYE_AT[1]) ** 2 <= WHITE_R * WHITE_R) return WHITE;
   return inside(x, y) ? INK : BG;
+}
+
+/**
+ * The blob as inline SVG, framed like icon() frames it. The body is filled with var(--boot-ink) so the
+ * loading screen can wear the current theme (Meadow green until a theme has been saved).
+ */
+function blobSvg() {
+  const n = (v) => +v.toFixed(4);
+  const hex = (rgb) => '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const tx = h * q, ty = d * q; // where a neck's sides meet the two circles
+  const necks = NECKS.map(([ax, ay, down]) => {
+    const pt = (along, across) => (down ? `${n(ax - across)} ${n(ay + along)}` : `${n(ax + along)} ${n(ay + across)}`);
+    const arc = `A${n(f)} ${n(f)} 0 0 0`;
+    return `<path d="M${pt(tx, -ty)}${arc} ${pt(1 - tx, -ty)}L${pt(1 - tx, ty)}${arc} ${pt(tx, ty)}Z"/>`;
+  });
+  const circle = ([x, y], r, fill = '') => `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}"${fill && ` fill="${fill}"`}/>`;
+  const extent = 1 + 2 * RADIUS;
+  const o = n(0.5 - extent / 2);
+  return `<svg viewBox="${o} ${o} ${n(extent)} ${n(extent)}"><g fill="var(--boot-ink, ${hex(INK)})">`
+    + CELLS.map((c) => circle(c, RADIUS)).join('') + necks.join('') + '</g>'
+    + circle(EYE_AT, WHITE_R, hex(WHITE)) + circle(PUPIL_AT, PUPIL_R, hex(PUPIL)) + '</svg>';
 }
 
 /** `scale`: the blob's width as a share of the icon (smaller for maskable icons, which get cropped). */
@@ -112,6 +131,13 @@ for (const [name, size, scale] of [['icon-192', 192, 0.64], ['icon-512', 512, 0.
   writeFileSync(new URL(`${name}.png`, OUT), icon(size, scale));
 }
 console.log('Wrote icons to public/icons/');
+
+const HTML = new URL('../index.html', import.meta.url);
+const html = readFileSync(HTML, 'utf8');
+const marked = /(<!-- blob -->).*?(<!-- \/blob -->)/s;
+if (!marked.test(html)) throw new Error('index.html has lost its <!-- blob --> <!-- /blob --> markers');
+writeFileSync(HTML, html.replace(marked, (_, open, close) => open + blobSvg() + close));
+console.log('Wrote the loading screen blob into index.html');
 
 // The iOS app (once `npx cap add ios` has made ios/): the App Store icon and the launch screen.
 const IOS = new URL('../ios/App/App/Assets.xcassets/', import.meta.url);

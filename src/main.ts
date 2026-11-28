@@ -926,6 +926,17 @@ function setBoardRule(code: string): void {
   buildRuleList();
 }
 
+/** Read by the inline script in index.html, so the next launch's loading screen opens in this theme. */
+const LOADING_COLOURS_KEY = 'softlife:boot';
+
+function rememberLoadingColours(p: Palette): void {
+  const root = document.documentElement.style;
+  root.setProperty('--boot-bg', p.bg);
+  root.setProperty('--boot-ink', p.cells[0]!);
+  // Only a cache, so it goes straight to localStorage rather than through store.ts and its native mirror.
+  try { localStorage.setItem(LOADING_COLOURS_KEY, JSON.stringify({ bg: p.bg, ink: p.cells[0] })); } catch { /* not kept */ }
+}
+
 function applyTheme(): void {
   const p = resolvePalette(settings.palette, customThemes);
   // A custom theme that's been deleted: back to Meadow, and remember that.
@@ -942,11 +953,7 @@ function applyTheme(): void {
   root.setProperty('--app-muted', p.muted);
   root.setProperty('--app-accent', p.accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg);
-  // For the loading screen in index.html, which runs before anything else. It's only a cache, so it
-  // goes straight to localStorage rather than through store.ts and its native mirror.
-  root.setProperty('--boot-bg', p.bg);
-  root.setProperty('--boot-ink', p.cells[0]!);
-  try { localStorage.setItem('softlife:boot', JSON.stringify({ bg: p.bg, ink: p.cells[0] })); } catch { /* not kept */ }
+  rememberLoadingColours(p);
   matchStatusBar(p.bg);
   buildThemes();
   buildSwatches();
@@ -1579,17 +1586,20 @@ syncBoardPop();
 if (!loadFromLink()) life.soup();
 setRunning(true);
 updateStats();
-requestAnimationFrame((t) => { lastStep = t; requestAnimationFrame(frame); });
-
-// The styles are in, so show the app under the loading screen (index.html), then fade that out
+// The styles are in, so the app can show under the loading screen (index.html), which fades out
 // once the board has drawn its first frame.
 document.documentElement.classList.remove('booting');
-requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+requestAnimationFrame((t) => {
+  lastStep = t;
+  requestAnimationFrame((now) => { frame(now); hideLoadingScreen(); });
+});
+
+function hideLoadingScreen(): void {
   const boot = document.getElementById('boot');
   if (!boot) return;
   boot.classList.add('done');
-  setTimeout(() => boot.remove(), 400);
-})));
+  setTimeout(() => boot.remove(), 400); // after its .3s fade
+}
 
 // The app ships its files inside itself, so only the web version needs the offline worker.
 if ('serviceWorker' in navigator && import.meta.env.PROD && !isNative) {
